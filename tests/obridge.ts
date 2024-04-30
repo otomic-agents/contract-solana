@@ -126,7 +126,8 @@ describe("obridge", async () => {
       connection,
       user,
       mint1,
-      escrow
+      escrow,
+      true
     );
     console.log(`created ata address ${escrowAtaTokenAccount.address} of user ${escrow} SLP token mint1 ${mint1}`)
 
@@ -146,7 +147,8 @@ describe("obridge", async () => {
         escrow: escrow,
         escrowAta: escrowAtaTokenAccount.address,
         associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-        tokenProgram: TOKEN_PROGRAM_ID
+        systemProgram: web3.SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
       })
       .signers([user])
       .rpc();

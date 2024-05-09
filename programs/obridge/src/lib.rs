@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::{
     self, get_associated_token_address_with_program_id as get_ata, AssociatedToken,
 };
-use anchor_spl::token::{self, Token};
+use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
@@ -21,6 +21,7 @@ pub mod obridge {
         amount: u64,
         lock1: Lock,
         lock2: Option<Lock>,
+        _extra_data: Vec<u8>,
     ) -> Result<()> {
         require!(amount > 0, Errors::InvalidAmount);
 
@@ -28,7 +29,7 @@ pub mod obridge {
             ctx.accounts.associated_token_program.to_account_info(),
             associated_token::Create {
                 payer: ctx.accounts.payer.to_account_info(),
-                associated_token: ctx.accounts.associated_token_program.to_account_info(),
+                associated_token: ctx.accounts.escrow_ata.to_account_info(),
                 authority: ctx.accounts.escrow.to_account_info(),
                 mint: ctx.accounts.mint.to_account_info(),
                 system_program: ctx.accounts.system_program.to_account_info(),
@@ -50,9 +51,13 @@ pub mod obridge {
 
         let escrow = &mut ctx.accounts.escrow;
         escrow.token_program = ctx.accounts.token_program.key.clone();
-        escrow.escrow_ata = ctx.accounts.escrow_ata.key.clone();
-        escrow.source = ctx.accounts.source.key.clone();
-        escrow.destination = get_ata(&to, &ctx.accounts.mint.key, &ctx.accounts.token_program.key);
+        escrow.escrow_ata = ctx.accounts.escrow_ata.key().clone();
+        escrow.source = ctx.accounts.source.key().clone();
+        escrow.destination = get_ata(
+            &to,
+            &ctx.accounts.mint.key(),
+            &ctx.accounts.token_program.key,
+        );
         escrow.amount = amount;
 
         let timestamp = Clock::get()?.unix_timestamp;
@@ -179,14 +184,13 @@ pub struct Initiate<'info> {
     #[account(mut)]
     pub from: Signer<'info>,
 
-    /// CHECK: token mint
-    pub mint: UncheckedAccount<'info>,
-    /// CHECK: transfer source account
-    pub source: UncheckedAccount<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(mut)]
+    pub source: Account<'info, TokenAccount>,
 
     #[account(init, payer = payer, space = size_of::<Escrow>() + 8, seeds = [&uuid], bump)]
     pub escrow: Account<'info, Escrow>,
-    #[account(address = get_ata(escrow.to_account_info().key, mint.key, token_program.key))]
+    #[account(mut, address = get_ata(&escrow.to_account_info().key(), &mint.key(), token_program.key))]
     /// CHECK: transfer escrow account
     pub escrow_ata: UncheckedAccount<'info>,
 
@@ -198,8 +202,8 @@ pub struct Initiate<'info> {
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 16])]
 pub struct Confirm<'info> {
-    /// CHECK: transfer destination account
-    pub destination: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub destination: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -211,8 +215,8 @@ pub struct Confirm<'info> {
         constraint = escrow.amount > 0 @ Errors::EscrowClosed,
     )]
     pub escrow: Account<'info, Escrow>,
-    /// CHECK: transfer escrow account
-    pub escrow_ata: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub escrow_ata: Account<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,
@@ -221,8 +225,8 @@ pub struct Confirm<'info> {
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 16])]
 pub struct Refund<'info> {
-    /// CHECK: transfer source account
-    pub source: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub source: Account<'info, TokenAccount>,
 
     #[account(
         mut,
@@ -234,8 +238,8 @@ pub struct Refund<'info> {
         constraint = escrow.amount > 0 @ Errors::EscrowClosed,
     )]
     pub escrow: Account<'info, Escrow>,
-    /// CHECK: transfer escrow account
-    pub escrow_ata: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub escrow_ata: Account<'info, TokenAccount>,
 
     pub system_program: Program<'info, System>,
     pub token_program: Program<'info, Token>,

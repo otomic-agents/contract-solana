@@ -21,9 +21,13 @@ pub mod obridge {
         amount: u64,
         lock1: Lock,
         lock2: Option<Lock>,
+        deadline: i64,
         _extra_data: Vec<u8>,
     ) -> Result<()> {
         require!(amount > 0, Errors::InvalidAmount);
+
+        let timestamp = Clock::get()?.unix_timestamp;
+        require!(timestamp <= deadline, Errors::DeadlineExceeded);
 
         associated_token::create(CpiContext::new(
             ctx.accounts.associated_token_program.to_account_info(),
@@ -60,10 +64,9 @@ pub mod obridge {
         );
         escrow.amount = amount;
 
-        let timestamp = Clock::get()?.unix_timestamp;
-        let max_deadline = timestamp + SECONDS_PER_YEAR;
+        let max_timelock = timestamp + SECONDS_PER_YEAR;
         require!(
-            lock1.deadline > timestamp && lock1.deadline <= max_deadline,
+            lock1.deadline > timestamp && lock1.deadline <= max_timelock,
             Errors::InvalidDeadline
         );
         escrow.lock1 = lock1;
@@ -71,7 +74,7 @@ pub mod obridge {
         if lock2.is_some() {
             let lock = lock2.unwrap();
             require!(
-                lock.deadline > timestamp && lock.deadline <= max_deadline,
+                lock.deadline > timestamp && lock.deadline <= max_timelock,
                 Errors::InvalidDeadline
             );
             escrow.lock2 = Some(lock);

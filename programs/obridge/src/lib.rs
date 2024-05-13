@@ -6,7 +6,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
-declare_id!("EV1AySxfDD9nJnfY6ZevgndQeUjeMwg1zB9vBdxqgCsN");
+declare_id!("2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu");
 
 const SECONDS_PER_YEAR: i64 = 60 * 60 * 24 * 365;
 

@@ -88,6 +88,10 @@
           "type": "i64"
         },
         {
+          "name": "refundTime",
+          "type": "i64"
+        },
+        {
           "name": "extraData",
           "type": "bytes"
         }
@@ -224,6 +228,10 @@
                 "defined": "Lock"
               }
             }
+          },
+          {
+            "name": "refundTime",
+            "type": "i64"
           }
         ]
       }
@@ -275,8 +283,8 @@
     },
     {
       "code": 6004,
-      "name": "InvalidDeadline",
-      "msg": "invalid deadline"
+      "name": "InvalidTimelock",
+      "msg": "invalid timelock"
     },
     {
       "code": 6005,
@@ -298,8 +306,5 @@
       "name": "NotRefundable",
       "msg": "not refundable yet"
     }
-  ],
-  "metadata": {
-    "address": "2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu"
-  }
+  ]
 }

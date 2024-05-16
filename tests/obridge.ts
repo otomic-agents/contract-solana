@@ -115,6 +115,7 @@ describe("obridge", async () => {
         let extraData = Buffer.from([1, 2, 3, 4, 5]);
 
         let transferOutDeadline = agreementReachedTime + 1 * stepTimelock;
+        let refundDeadline = agreementReachedTime + 7 * stepTimelock;
 
         // user initiate the swap (transfer out)
         const tx = await program.methods
@@ -125,6 +126,7 @@ describe("obridge", async () => {
                 lockUser,
                 lockRelay,
                 new BN(transferOutDeadline),
+                new BN(refundDeadline),
                 extraData
             )
             .accounts({
@@ -153,6 +155,7 @@ describe("obridge", async () => {
                     lockUser,
                     lockRelay,
                     new BN(transferOutDeadline),
+                    new BN(refundDeadline),
                     extraData
                 )
                 .accounts({
@@ -205,6 +208,7 @@ describe("obridge", async () => {
                 lockLp,
                 null,
                 new BN(transferInDeadline),
+                new BN(refundDeadline),
                 extraData
             )
             .accounts({
@@ -341,6 +345,7 @@ describe("obridge", async () => {
         let extraData = Buffer.from([1, 2, 3, 4, 5]);
 
         let transferOutDeadline = agreementReachedTime + 1 * stepTimelock;
+        let refundDeadline = agreementReachedTime + 7 * stepTimelock;
 
         // user initiate the swap (transfer out)
         const tx = await program.methods
@@ -351,6 +356,7 @@ describe("obridge", async () => {
                 lockUser,
                 lockRelay,
                 new BN(transferOutDeadline),
+                new BN(refundDeadline),
                 extraData
             )
             .accounts({
@@ -399,6 +405,7 @@ describe("obridge", async () => {
                 lockLp,
                 null,
                 new BN(transferInDeadline),
+                new BN(refundDeadline),
                 extraData
             )
             .accounts({
@@ -438,7 +445,7 @@ describe("obridge", async () => {
             console.log((err as AnchorError).logs);
             expect((err as AnchorError).logs).not.to.be.empty;
         }
-        console.log(`wait until the agreement reached time + 6 * stepTimelock: ${agreementReachedTime + 6 * stepTimelock}`);
+        console.log(`wait until the agreement reached time + 7 * stepTimelock: ${agreementReachedTime + 7 * stepTimelock}`);
         while (true) {
             let slot = await connection.getSlot();
             let currentTime = await connection.getBlockTime(slot);
@@ -446,7 +453,7 @@ describe("obridge", async () => {
                 throw new Error("currentTime is null");
             }
             console.log(`currentTime: ${currentTime}`);
-            if (currentTime > agreementReachedTime + 6 * stepTimelock) {
+            if (currentTime > agreementReachedTime + 7 * stepTimelock) {
                 break;
             }
             await sleep(1000);

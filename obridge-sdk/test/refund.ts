@@ -84,6 +84,7 @@ async function main() {
         userLock,
         relayLock,
         new BN(agreementReachedTime + 1 * stepTimelock),
+        new BN(agreementReachedTime + 7 * stepTimelock),
         Buffer.from([1,2,3,4,5,6,7,8,9,0]),
         user,
         userAtaTokenMint1Account.address,
@@ -112,6 +113,7 @@ async function main() {
         new BN(amountBack),
         lpLock,
         new BN(agreementReachedTime + 2 * stepTimelock),
+        new BN(agreementReachedTime + 7 * stepTimelock),
         Buffer.from([1,2,3,4,5,6,7,8,9,0]),
         lp,
         lpAtaTokenMint2Account.address,
@@ -123,14 +125,14 @@ async function main() {
     console.log(`transfer in tx: ${txHash}`);
 
     // refund transfer out
-    console.log(`wait until the agreement reached time + 6 * stepTimelock: ${agreementReachedTime + 6 * stepTimelock}`);
+    console.log(`wait until the agreement reached time + 7 * stepTimelock: ${agreementReachedTime + 7 * stepTimelock}`);
     while (true) {
         let curTimestamp = await obSrv.getCurOnChainTimestamp();
         if (!curTimestamp) {
             throw new Error("currentTime is null");
         }
         console.log(`currentTime: ${curTimestamp}`);
-        if (curTimestamp > agreementReachedTime + 6 * stepTimelock) {
+        if (curTimestamp > agreementReachedTime + 7 * stepTimelock) {
             break;
         }
         await sleep(1000);

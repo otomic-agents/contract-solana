@@ -88,7 +88,8 @@ export class ObridgeService {
         amount: BN,
         userLock: Lock,
         relayLock: Lock,
-        deadline: BN,
+        transferOutDeadline: BN,
+        refundDeadline: BN,
         extraData: Buffer,
         from: Keypair,
         source: PublicKey,
@@ -104,7 +105,8 @@ export class ObridgeService {
                 amount,
                 userLock,
                 relayLock,
-                deadline,
+                transferOutDeadline,
+                refundDeadline,
                 extraData
             )
             .accounts({
@@ -136,7 +138,8 @@ export class ObridgeService {
         user: PublicKey,
         amount: BN,
         lpLock: Lock,
-        deadline: BN,
+        transferOutDeadline: BN,
+        refundDeadline: BN,
         extraData: Buffer,
         from: Keypair,
         source: PublicKey,
@@ -152,7 +155,8 @@ export class ObridgeService {
                 amount,
                 lpLock,
                 null,
-                deadline,
+                transferOutDeadline,
+                refundDeadline,
                 extraData
             )
             .accounts({

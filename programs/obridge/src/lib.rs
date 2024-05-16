@@ -22,6 +22,7 @@ pub mod obridge {
         lock1: Lock,
         lock2: Option<Lock>,
         deadline: i64,
+        refund_time: i64,
         _extra_data: Vec<u8>,
     ) -> Result<()> {
         require!(amount > 0, Errors::InvalidAmount);
@@ -65,17 +66,19 @@ pub mod obridge {
         escrow.amount = amount;
 
         let max_timelock = timestamp + SECONDS_PER_YEAR;
+        require!(refund_time <= max_timelock, Errors::InvalidTimelock);
         require!(
-            lock1.deadline > timestamp && lock1.deadline <= max_timelock,
-            Errors::InvalidDeadline
+            lock1.deadline > timestamp && lock1.deadline <= refund_time,
+            Errors::InvalidTimelock
         );
         escrow.lock1 = lock1;
+        escrow.refund_time = refund_time;
 
         if lock2.is_some() {
             let lock = lock2.unwrap();
             require!(
-                lock.deadline > timestamp && lock.deadline <= max_timelock,
-                Errors::InvalidDeadline
+                lock.deadline > timestamp && lock.deadline <= refund_time,
+                Errors::InvalidTimelock
             );
             escrow.lock2 = Some(lock);
         }
@@ -117,13 +120,7 @@ pub mod obridge {
         let escrow = &mut ctx.accounts.escrow;
         let timestamp = Clock::get()?.unix_timestamp;
 
-        require!(timestamp > escrow.lock1.deadline, Errors::NotRefundable);
-        if escrow.lock2.is_some() {
-            require!(
-                timestamp > escrow.lock2.clone().unwrap().deadline,
-                Errors::NotRefundable
-            );
-        }
+        require!(timestamp > escrow.refund_time, Errors::NotRefundable);
 
         token::transfer(
             CpiContext::new_with_signer(
@@ -153,8 +150,8 @@ pub enum Errors {
     FailedToUnlock,
     #[msg("invalid amount")]
     InvalidAmount,
-    #[msg("invalid deadline")]
-    InvalidDeadline,
+    #[msg("invalid timelock")]
+    InvalidTimelock,
     #[msg("invalid destination")]
     InvalidDestination,
     #[msg("deadline exceeded")]
@@ -257,4 +254,5 @@ pub struct Escrow {
     pub amount: u64,
     pub lock1: Lock,
     pub lock2: Option<Lock>,
+    pub refund_time: i64,
 }

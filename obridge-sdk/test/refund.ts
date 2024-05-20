@@ -12,17 +12,22 @@ import {
 } from "@solana/spl-token";
 import { ObridgeService, Lock, ExtraData } from "../src/ObridgeService";
 import {
-    airdropSOL,
     createAccountOnChain,
     createSPLTokenAndMintToUser,
     sleep
 } from "./utils";
 
+import "dotenv/config";
+
 async function main() {
-    const connection = new Connection("http://127.0.0.1:8899", "confirmed");
+    const connection = new Connection("https://api.devnet.solana.com", "confirmed");
     const obridgeProgramId = new PublicKey("2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu");
-    const payer = Keypair.generate();
-    await airdropSOL(connection, payer.publicKey, 10 * 10 ** 9);
+    const payerPrivateKey = process.env.PAYER_PRIVATE_KEY;
+    if (!payerPrivateKey) {
+        console.error('PAYER_PRIVATE_KEY is not set');
+        return;
+    }
+    const payer = Keypair.fromSecretKey(Uint8Array.from(payerPrivateKey.split(',').map(s => parseInt(s))));
     const obSrv = new ObridgeService(connection, payer, obridgeProgramId);
 
     // setup
@@ -58,7 +63,7 @@ async function main() {
         console.log("failed to get on-chain timestamp");
         return;
     }
-    let stepTimelock = 1;
+    let stepTimelock = 5;
 
 
     // transfer Out

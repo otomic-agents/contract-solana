@@ -4,15 +4,18 @@ import {
     PublicKey,
 } from "@solana/web3.js";
 import { ObridgeService } from "../src/ObridgeService";
-import {
-    airdropSOL,
-} from "./utils";
+
+import "dotenv/config";
 
 async function main() {
-    const connection = new Connection("http://127.0.0.1:8899", "confirmed");
+    const connection = new Connection("https://api.devnet.solana.com", "finalized");
     const obridgeProgramId = new PublicKey("2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu");
-    const payer = Keypair.generate();
-    await airdropSOL(connection, payer.publicKey, 10 * 10 ** 9);
+    const payerPrivateKey = process.env.PAYER_PRIVATE_KEY;
+    if (!payerPrivateKey) {
+        console.error('PAYER_PRIVATE_KEY is not set');
+        return;
+    }
+    const payer = Keypair.fromSecretKey(Uint8Array.from(payerPrivateKey.split(',').map(s => parseInt(s))));
     const obSrv = new ObridgeService(connection, payer, obridgeProgramId, true);
 }
 

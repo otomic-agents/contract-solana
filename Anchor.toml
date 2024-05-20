@@ -7,11 +7,14 @@ skip-lint = false
 [programs.localnet]
 obridge = "2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu"
 
+[programs.devnet]
+obridge = "2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu"
+
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

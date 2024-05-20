@@ -11,7 +11,7 @@ import {
     getOrCreateAssociatedTokenAccount,
     TOKEN_PROGRAM_ID
 } from "@solana/spl-token";
-import { ObridgeService, Lock } from "../src/ObridgeService";
+import { ObridgeService, Lock, ExtraData } from "../src/ObridgeService";
 import {
     airdropSOL,
     createAccountOnChain,
@@ -77,6 +77,17 @@ async function main() {
     let escrow1 = obSrv.getEscrowAccountAddress(uuid1);
     let escrow1Ata = obSrv.getEscrowAtaTokenAddress(escrow1, mint1);
 
+    let extraData: ExtraData = {
+        dstChainId: "1",
+        dstAddress: "0x...",
+        dstToken: "usdt",
+        dstAmount: "100",
+        requestor: "requestor",
+        lpId: "lpId",
+        userSign: "0x...",
+        lpSign: "0x..."
+    };
+
     let txHash = await obSrv.transferOut(
         uuid1,
         lp.publicKey,
@@ -85,7 +96,7 @@ async function main() {
         relayLock,
         new BN(agreementReachedTime + 1 * stepTimelock),
         new BN(agreementReachedTime + 7 * stepTimelock),
-        Buffer.from([1,2,3,4,5,6,7,8,9,0]),
+        extraData,
         user,
         userAtaTokenMint1Account.address,
         escrow1,
@@ -114,7 +125,6 @@ async function main() {
         lpLock,
         new BN(agreementReachedTime + 2 * stepTimelock),
         new BN(agreementReachedTime + 7 * stepTimelock),
-        Buffer.from([1,2,3,4,5,6,7,8,9,0]),
         lp,
         lpAtaTokenMint2Account.address,
         escrow2,

@@ -93,7 +93,7 @@ async function main() {
         lpSign: "0x..."
     }
 
-    let txHash = await obSrv.transferOut(
+    let signedTx = await obSrv.transferOut(
         uuid1,
         lp.publicKey,
         new BN(amount),
@@ -109,6 +109,7 @@ async function main() {
         mint1,
         TOKEN_PROGRAM_ID
     );
+    let txHash = await obSrv.sendTransaction(signedTx);
     console.log(`transfer out tx: ${txHash}`);
 
     // transfer In
@@ -123,7 +124,7 @@ async function main() {
     let escrow2 = obSrv.getEscrowAccountAddress(uuid2);
     let escrow2Ata = obSrv.getEscrowAtaTokenAddress(escrow2, mint2);
 
-    txHash = await obSrv.transferIn(
+    signedTx = await obSrv.transferIn(
         uuid2,
         user.publicKey,
         new BN(amountBack),
@@ -137,6 +138,7 @@ async function main() {
         mint2,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`transfer in tx: ${txHash}`);
 
     // refund transfer out
@@ -154,24 +156,26 @@ async function main() {
     }
 
     console.log(`========== refund transfer out ==========`);
-    txHash = await obSrv.refundTransferOut(
+    signedTx = await obSrv.refundTransferOut(
         uuid1,
         userAtaTokenMint1Account.address,
         escrow1,
         escrow1Ata,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`refund transfer out tx: ${txHash}`);
 
     // refund transfer in
     console.log(`========== refund transfer in ==========`);
-    txHash = await obSrv.refundTransferIn(
+    signedTx = await obSrv.refundTransferIn(
         uuid2,
         lpAtaTokenMint2Account.address,
         escrow2,
         escrow2Ata,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`refund transfer in tx: ${txHash}`);
 }
 

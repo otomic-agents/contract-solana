@@ -93,7 +93,7 @@ async function main() {
         lpSign: "0x..."
     };
 
-    let txHash = await obSrv.transferOut(
+    let signedTx = await obSrv.transferOut(
         uuid1,
         lp.publicKey,
         new BN(amount),
@@ -109,6 +109,7 @@ async function main() {
         mint1,
         TOKEN_PROGRAM_ID
     );
+    let txHash = await obSrv.sendTransaction(signedTx);
     console.log(`transfer out tx: ${txHash}`);
 
     // transfer In
@@ -123,7 +124,7 @@ async function main() {
     let escrow2 = obSrv.getEscrowAccountAddress(uuid2);
     let escrow2Ata = obSrv.getEscrowAtaTokenAddress(escrow2, mint2);
 
-    txHash = await obSrv.transferIn(
+    signedTx = await obSrv.transferIn(
         uuid2,
         user.publicKey,
         new BN(amountBack),
@@ -137,12 +138,13 @@ async function main() {
         mint2,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`transfer in tx: ${txHash}`);
 
     // confirm transfer out
     console.log(`========== confirm transfer out ==========`);
     let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
-    txHash = await obSrv.confirmTransferOut(
+    signedTx = await obSrv.confirmTransferOut(
         uuid1,
         userLockPreimage,
         lpAtaTokenMint1Account.address,
@@ -150,12 +152,13 @@ async function main() {
         escrow1Ata,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`confirm transfer out tx: ${txHash}`);
 
     // confirm transfer in
     console.log(`========== confirm transfer in ==========`);
     let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint2, user.publicKey);
-    txHash = await obSrv.confirmTransferIn(
+    signedTx = await obSrv.confirmTransferIn(
         uuid2,
         userLockPreimage,
         userAtaTokenMint2Account.address,
@@ -163,6 +166,7 @@ async function main() {
         escrow2Ata,
         TOKEN_PROGRAM_ID
     );
+    txHash = await obSrv.sendTransaction(signedTx);
     console.log(`confirm transfer out tx: ${txHash}`);
 }
 

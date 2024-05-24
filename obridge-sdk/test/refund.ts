@@ -93,7 +93,7 @@ async function main() {
         lpSign: "0x..."
     }
 
-    let signedTx = await obSrv.transferOut(
+    let tx = await obSrv.transferOut(
         uuid1,
         lp.publicKey,
         new BN(amount),
@@ -109,7 +109,7 @@ async function main() {
         mint1,
         TOKEN_PROGRAM_ID
     );
-    let txHash = await obSrv.sendTransaction(signedTx);
+    let txHash = await obSrv.sendTransaction(tx, [payer, user]);
     console.log(`transfer out tx: ${txHash}`);
 
     // transfer In
@@ -124,7 +124,7 @@ async function main() {
     let escrow2 = obSrv.getEscrowAccountAddress(uuid2);
     let escrow2Ata = obSrv.getEscrowAtaTokenAddress(escrow2, mint2);
 
-    signedTx = await obSrv.transferIn(
+    tx = await obSrv.transferIn(
         uuid2,
         user.publicKey,
         new BN(amountBack),
@@ -138,7 +138,7 @@ async function main() {
         mint2,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer, lp]);
     console.log(`transfer in tx: ${txHash}`);
 
     // refund transfer out
@@ -156,26 +156,26 @@ async function main() {
     }
 
     console.log(`========== refund transfer out ==========`);
-    signedTx = await obSrv.refundTransferOut(
+    tx = await obSrv.refundTransferOut(
         uuid1,
         userAtaTokenMint1Account.address,
         escrow1,
         escrow1Ata,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer]);
     console.log(`refund transfer out tx: ${txHash}`);
 
     // refund transfer in
     console.log(`========== refund transfer in ==========`);
-    signedTx = await obSrv.refundTransferIn(
+    tx = await obSrv.refundTransferIn(
         uuid2,
         lpAtaTokenMint2Account.address,
         escrow2,
         escrow2Ata,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer]);
     console.log(`refund transfer in tx: ${txHash}`);
 }
 

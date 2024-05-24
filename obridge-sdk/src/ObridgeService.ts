@@ -101,10 +101,12 @@ export class ObridgeService {
         return deserialize(extraDataBuffer);
     }
 
-    async sendTransaction(rawTx: string) {
+    async sendTransaction(rawTx: string, signers: Keypair[]): Promise<string> {
         let recoveredTransaction = Transaction.from(
             Buffer.from(rawTx, 'hex')
         );
+
+        recoveredTransaction.sign(...signers);
 
         let signature = await this.connection.sendRawTransaction(recoveredTransaction.serialize());
         return signature;
@@ -160,8 +162,10 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer, from);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 
     /*
@@ -212,8 +216,10 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer, from);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 
     /*
@@ -247,8 +253,10 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 
     /*
@@ -282,8 +290,10 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 
     /*
@@ -314,8 +324,10 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 
     /*
@@ -346,7 +358,9 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        tx.sign(this.payer);
-        return tx.serialize().toString("hex");
+        return tx.serialize({
+            requireAllSignatures: false,
+            verifySignatures: true
+        }).toString("hex");
     }
 }

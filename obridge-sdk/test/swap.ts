@@ -93,7 +93,7 @@ async function main() {
         lpSign: "0x..."
     };
 
-    let signedTx = await obSrv.transferOut(
+    let tx = await obSrv.transferOut(
         uuid1,
         lp.publicKey,
         new BN(amount),
@@ -109,7 +109,7 @@ async function main() {
         mint1,
         TOKEN_PROGRAM_ID
     );
-    let txHash = await obSrv.sendTransaction(signedTx);
+    let txHash = await obSrv.sendTransaction(tx, [payer, user]);
     console.log(`transfer out tx: ${txHash}`);
 
     // transfer In
@@ -124,7 +124,7 @@ async function main() {
     let escrow2 = obSrv.getEscrowAccountAddress(uuid2);
     let escrow2Ata = obSrv.getEscrowAtaTokenAddress(escrow2, mint2);
 
-    signedTx = await obSrv.transferIn(
+    tx = await obSrv.transferIn(
         uuid2,
         user.publicKey,
         new BN(amountBack),
@@ -138,13 +138,13 @@ async function main() {
         mint2,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer, lp]);
     console.log(`transfer in tx: ${txHash}`);
 
     // confirm transfer out
     console.log(`========== confirm transfer out ==========`);
     let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
-    signedTx = await obSrv.confirmTransferOut(
+    tx = await obSrv.confirmTransferOut(
         uuid1,
         userLockPreimage,
         lpAtaTokenMint1Account.address,
@@ -152,13 +152,13 @@ async function main() {
         escrow1Ata,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer]);
     console.log(`confirm transfer out tx: ${txHash}`);
 
     // confirm transfer in
     console.log(`========== confirm transfer in ==========`);
     let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint2, user.publicKey);
-    signedTx = await obSrv.confirmTransferIn(
+    tx = await obSrv.confirmTransferIn(
         uuid2,
         userLockPreimage,
         userAtaTokenMint2Account.address,
@@ -166,7 +166,7 @@ async function main() {
         escrow2Ata,
         TOKEN_PROGRAM_ID
     );
-    txHash = await obSrv.sendTransaction(signedTx);
+    txHash = await obSrv.sendTransaction(tx, [payer]);
     console.log(`confirm transfer out tx: ${txHash}`);
 }
 

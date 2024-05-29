@@ -181,7 +181,7 @@ export class ObridgeService {
         user: PublicKey,
         amount: BN,
         lpLock: Lock,
-        transferOutDeadline: BN,
+        transferInDeadline: BN,
         refundDeadline: BN,
         from: Keypair,
         source: PublicKey,
@@ -197,7 +197,7 @@ export class ObridgeService {
                 amount,
                 lpLock,
                 null,
-                transferOutDeadline,
+                transferInDeadline,
                 refundDeadline,
                 Buffer.from([])
             )

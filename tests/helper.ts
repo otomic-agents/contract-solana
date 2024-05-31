@@ -3,6 +3,9 @@ import {
     createMint,
     getOrCreateAssociatedTokenAccount,
     mintTo,
+    TOKEN_PROGRAM_ID,
+    AccountLayout,
+    getMint
 } from "@solana/spl-token";
 
 export async function createAccountOnChain(connection: web3.Connection, payer: web3.Keypair): Promise<web3.Keypair> {
@@ -78,4 +81,17 @@ export async function createSPLTokenAndMintToUser(connection: web3.Connection, p
 
 export async function sleep(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export async function splTokensBalance(connection: web3.Connection, account: web3.PublicKey) {
+    let tokenAccounts = await connection.getTokenAccountsByOwner(account, {
+        programId: TOKEN_PROGRAM_ID,
+    });
+    console.log(`account ${account.toBase58()} spl balance:`)
+    for (let tokenAccount of tokenAccounts.value) {
+        const accountData = AccountLayout.decode(tokenAccount.account.data);
+        let mintInfo = await getMint(connection, accountData.mint);
+        console.log(`token program: ${TOKEN_PROGRAM_ID.toBase58()}, mint: ${accountData.mint.toBase58()}, decimals: ${mintInfo.decimals}, balance: ${accountData.amount}`);
+    }
+
 }

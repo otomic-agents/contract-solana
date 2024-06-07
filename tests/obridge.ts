@@ -394,7 +394,7 @@ describe('obridge swap', () => {
 
         // user confirm the swap (transfer out)
         const tx3 = await program.methods
-            .confirm(uuid1, relayPreimage)
+            .confirm(uuid1, preimage)
             .accounts({
                 to: lp.publicKey,
                 destination: lpAtaTokenMint1Account.address,

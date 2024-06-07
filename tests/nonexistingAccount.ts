@@ -1,33 +1,26 @@
-import crypto from "crypto";
-import * as anchor from "@coral-xyz/anchor";
-import { Program, web3, AnchorError } from "@coral-xyz/anchor";
-import { Obridge } from "../target/types/obridge";
+import crypto from 'crypto';
+import * as anchor from '@coral-xyz/anchor';
+import { Program, web3, AnchorError } from '@coral-xyz/anchor';
+import { Obridge } from '../target/types/obridge';
 import {
     getAccount,
     TOKEN_PROGRAM_ID,
     ASSOCIATED_TOKEN_PROGRAM_ID,
     getAssociatedTokenAddressSync,
     getOrCreateAssociatedTokenAccount,
-    Account
-} from "@solana/spl-token";
-import { keccak_256 } from "@noble/hashes/sha3";
-import BN from "bn.js";
-import {
-    createAccountOnChain,
-    airdropSOL,
-    createSPLTokenAndMintToUser,
-    sleep,
-    splTokensBalance
-} from "./helper";
-import { expect } from "chai";
+    Account,
+} from '@solana/spl-token';
+import { keccak_256 } from '@noble/hashes/sha3';
+import BN from 'bn.js';
+import { createAccountOnChain, airdropSOL, createSPLTokenAndMintToUser, sleep, splTokensBalance } from './helper';
+import { expect } from 'chai';
 
 type Lock = {
-    hash: Array<number>
-    deadline: BN
-}
+    hash: Array<number>;
+    deadline: BN;
+};
 
-describe("nonexisting account", () => {
-
+describe('nonexisting account', () => {
     // Configure the client to use the local cluster.
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
@@ -58,7 +51,7 @@ describe("nonexisting account", () => {
     let hashlock: Array<number>;
     let relayHashlock: Array<number>;
 
-    it("nonexisting account test", async () => {
+    it('nonexisting account test', async () => {
         console.log(`========== setup up ==========`);
         await airdropSOL(connection, payer, 10 * 10 ** 9);
         const payerBal = await connection.getBalance(payer.publicKey);
@@ -71,12 +64,13 @@ describe("nonexisting account", () => {
         let ret = await createSPLTokenAndMintToUser(connection, payer, user, amount);
         mint1 = ret.mint;
         userAtaTokenMint1Account = ret.ataTokenAccount;
-        console.log(`create SPL token mint1 ${mint1} and user ${user.publicKey} ata account ${userAtaTokenMint1Account.address}`);
-        userAtaTokenMint1Account = await getAccount(
-            connection,
-            userAtaTokenMint1Account.address
+        console.log(
+            `create SPL token mint1 ${mint1} and user ${user.publicKey} ata account ${userAtaTokenMint1Account.address}`,
         );
-        console.log(`user ata token mint1 account ${userAtaTokenMint1Account.address} balance: ${userAtaTokenMint1Account.amount}`);
+        userAtaTokenMint1Account = await getAccount(connection, userAtaTokenMint1Account.address);
+        console.log(
+            `user ata token mint1 account ${userAtaTokenMint1Account.address} balance: ${userAtaTokenMint1Account.amount}`,
+        );
 
         // create lp offchain and see what happens
         lp = web3.Keypair.generate();
@@ -85,12 +79,13 @@ describe("nonexisting account", () => {
         ret = await createSPLTokenAndMintToUser(connection, payer, lp, amountBack);
         mint2 = ret.mint;
         lpAtaTokenMint2Account = ret.ataTokenAccount;
-        console.log(`create SPL token mint2 ${mint2} and lp ${lp.publicKey} ata account ${lpAtaTokenMint2Account.address}`);
-        lpAtaTokenMint2Account = await getAccount(
-            connection,
-            lpAtaTokenMint2Account.address
+        console.log(
+            `create SPL token mint2 ${mint2} and lp ${lp.publicKey} ata account ${lpAtaTokenMint2Account.address}`,
         );
-        console.log(`lp ata token mint2 account ${lpAtaTokenMint2Account.address} balance: ${lpAtaTokenMint2Account.amount}`);
+        lpAtaTokenMint2Account = await getAccount(connection, lpAtaTokenMint2Account.address);
+        console.log(
+            `lp ata token mint2 account ${lpAtaTokenMint2Account.address} balance: ${lpAtaTokenMint2Account.amount}`,
+        );
 
         let _preimage = new Uint8Array(32);
         preimage = Array.from(crypto.getRandomValues(_preimage));
@@ -101,7 +96,7 @@ describe("nonexisting account", () => {
         let slot = await connection.getSlot();
         agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
-            throw new Error("agreementReachedTime is null");
+            throw new Error('agreementReachedTime is null');
         }
         console.log(`agreementReachedTime: ${agreementReachedTime}`);
         stepTimelock = 60;
@@ -110,7 +105,7 @@ describe("nonexisting account", () => {
         hashlock = Array.from(keccak_256(Buffer.from(preimage)));
         relayHashlock = Array.from(keccak_256(Buffer.from(relayPreimage)));
 
-        console.log(`========== before swap ==========`)
+        console.log(`========== before swap ==========`);
         await splTokensBalance(connection, user.publicKey);
         await splTokensBalance(connection, lp.publicKey);
 
@@ -121,18 +116,18 @@ describe("nonexisting account", () => {
 
         let lockUser: Lock = {
             hash: hashlock,
-            deadline: new BN(agreementReachedTime + 3 * stepTimelock)
-        }
+            deadline: new BN(agreementReachedTime + 3 * stepTimelock),
+        };
         console.log(`lockUser: ${JSON.stringify(lockUser)}`);
 
         let lockRelay: Lock = {
             hash: relayHashlock,
-            deadline: new BN(agreementReachedTime + 6 * stepTimelock)
-        }
+            deadline: new BN(agreementReachedTime + 6 * stepTimelock),
+        };
         console.log(`lockRelay: ${JSON.stringify(lockRelay)}`);
 
         // calculate escrow account address offchain without create it
-        let [escrow1,] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
+        let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
         // calculate escrowAtaTokenAccount account address offchain without create it
@@ -154,7 +149,7 @@ describe("nonexisting account", () => {
                 lockRelay,
                 new BN(transferOutDeadline),
                 new BN(refundDeadline),
-                extraData
+                extraData,
             )
             .accounts({
                 payer: payer.publicKey,
@@ -179,14 +174,14 @@ describe("nonexisting account", () => {
 
         let lockLp: Lock = {
             hash: hashlock,
-            deadline: new BN(agreementReachedTime + 5 * stepTimelock)
-        }
+            deadline: new BN(agreementReachedTime + 5 * stepTimelock),
+        };
         console.log(`lockLp: ${JSON.stringify(lockLp)}`);
 
         let transferInDeadline = agreementReachedTime + 2 * stepTimelock;
 
         // calculate escrow account address offchain without create it
-        let [escrow2,] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
+        let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
         console.log(`offchain escrow2: ${escrow2}`);
 
         // calculate escrowAtaTokenAccount account address offchain without create it
@@ -203,7 +198,7 @@ describe("nonexisting account", () => {
                 null,
                 new BN(transferInDeadline),
                 new BN(refundDeadline),
-                extraData
+                extraData,
             )
             .accounts({
                 payer: payer.publicKey,
@@ -226,10 +221,7 @@ describe("nonexisting account", () => {
         let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
         // user confirm the swap (transfer out)
         const tx3 = await program.methods
-            .confirm(
-                uuid1,
-                preimage
-            )
+            .confirm(uuid1, preimage)
             .accounts({
                 destination: lpAtaTokenMint1Account.address,
                 escrow: escrow1,
@@ -243,13 +235,15 @@ describe("nonexisting account", () => {
 
         console.log(`========== confirm transfer in ==========`);
         // user token mint2 ata address
-        let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint2, user.publicKey);
+        let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(
+            connection,
+            payer,
+            mint2,
+            user.publicKey,
+        );
         // lp confirm the swap (transfer in)
         const tx4 = await program.methods
-            .confirm(
-                uuid2,
-                preimage
-            )
+            .confirm(uuid2, preimage)
             .accounts({
                 destination: userAtaTokenMint2Account.address,
                 escrow: escrow2,
@@ -261,10 +255,8 @@ describe("nonexisting account", () => {
 
         console.log(`confirm transfer in tx: ${tx4}`);
 
-        console.log(`========== after swap ==========`)
+        console.log(`========== after swap ==========`);
         await splTokensBalance(connection, user.publicKey);
         await splTokensBalance(connection, lp.publicKey);
-
-
     });
 });

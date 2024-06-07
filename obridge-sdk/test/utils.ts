@@ -1,16 +1,5 @@
-import {
-    Connection,
-    Keypair,
-    PublicKey,
-    SystemProgram,
-    Transaction,
-    sendAndConfirmTransaction
-} from "@solana/web3.js";
-import {
-    createMint,
-    getOrCreateAssociatedTokenAccount,
-    mintTo,
-} from "@solana/spl-token";
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import { createMint, getOrCreateAssociatedTokenAccount, mintTo } from '@solana/spl-token';
 
 export async function airdropSOL(connection: Connection, address: PublicKey, amountInLamports: number) {
     let accountBal = await connection.getBalance(address);
@@ -36,53 +25,40 @@ export async function createAccountOnChain(connection: Connection, payer: Keypai
         programId: SystemProgram.programId,
     };
 
-    const createAccountTransaction = new Transaction().add(
-        SystemProgram.createAccount(createAccountParams),
-    );
+    const createAccountTransaction = new Transaction().add(SystemProgram.createAccount(createAccountParams));
 
-    await sendAndConfirmTransaction(connection, createAccountTransaction, [
-        payer,
-        newAccountPubkey,
-    ]);
+    await sendAndConfirmTransaction(connection, createAccountTransaction, [payer, newAccountPubkey]);
 
     return newAccountPubkey;
 }
 
-export async function createSPLTokenAndMintToUser(connection: Connection, payer: Keypair, user: Keypair, amountInLamports: number) {
-
+export async function createSPLTokenAndMintToUser(
+    connection: Connection,
+    payer: Keypair,
+    user: Keypair,
+    amountInLamports: number,
+) {
     // create SPL Token Mint
     const mint = await createMint(
         connection,
         payer,
         payer.publicKey,
         payer.publicKey,
-        9 // token decimals
+        9, // token decimals
     );
 
     // create user ata account for token mint
-    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        payer,
-        mint,
-        user.publicKey
-    );
+    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(connection, payer, mint, user.publicKey);
 
     // mint amount token to user
-    await mintTo(
-        connection,
-        payer,
-        mint,
-        ataTokenAccount.address,
-        payer.publicKey,
-        amountInLamports
-    );
+    await mintTo(connection, payer, mint, ataTokenAccount.address, payer.publicKey, amountInLamports);
 
     return {
         mint,
-        ataTokenAccount
+        ataTokenAccount,
     };
 }
 
 export async function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }

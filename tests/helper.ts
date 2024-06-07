@@ -1,12 +1,12 @@
-import { web3 } from "@coral-xyz/anchor";
+import { web3 } from '@coral-xyz/anchor';
 import {
     createMint,
     getOrCreateAssociatedTokenAccount,
     mintTo,
     TOKEN_PROGRAM_ID,
     AccountLayout,
-    getMint
-} from "@solana/spl-token";
+    getMint,
+} from '@solana/spl-token';
 
 export async function createAccountOnChain(connection: web3.Connection, payer: web3.Keypair): Promise<web3.Keypair> {
     // amount of space to reserve for the account
@@ -24,14 +24,9 @@ export async function createAccountOnChain(connection: web3.Connection, payer: w
         programId: web3.SystemProgram.programId,
     };
 
-    const createAccountTransaction = new web3.Transaction().add(
-        web3.SystemProgram.createAccount(createAccountParams),
-    );
+    const createAccountTransaction = new web3.Transaction().add(web3.SystemProgram.createAccount(createAccountParams));
 
-    await web3.sendAndConfirmTransaction(connection, createAccountTransaction, [
-        payer,
-        newAccountPubkey,
-    ]);
+    await web3.sendAndConfirmTransaction(connection, createAccountTransaction, [payer, newAccountPubkey]);
 
     return newAccountPubkey;
 }
@@ -44,54 +39,66 @@ export async function airdropSOL(connection: web3.Connection, account: web3.Keyp
     }
 }
 
-export async function createSPLTokenAndMintToUser(connection: web3.Connection, payer: web3.Keypair, user: web3.Keypair, amountInLamports: number) {
-
+export async function createSPLTokenAndMintToUser(
+    connection: web3.Connection,
+    payer: web3.Keypair,
+    user: web3.Keypair,
+    amountInLamports: number,
+) {
     // create SPL Token Mint
     const mint = await createMint(
         connection,
         payer,
         payer.publicKey,
         payer.publicKey,
-        9 // token decimals
+        9, // token decimals
     );
 
     // create user ata account for token mint
-    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        payer,
-        mint,
-        user.publicKey
-    );
+    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(connection, payer, mint, user.publicKey);
 
     // mint amount token to user
-    await mintTo(
-        connection,
-        payer,
-        mint,
-        ataTokenAccount.address,
-        payer.publicKey,
-        amountInLamports
-    );
+    await mintTo(connection, payer, mint, ataTokenAccount.address, payer.publicKey, amountInLamports);
 
     return {
         mint,
-        ataTokenAccount
+        ataTokenAccount,
     };
 }
 
 export async function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function splTokensBalance(connection: web3.Connection, account: web3.PublicKey) {
     let tokenAccounts = await connection.getTokenAccountsByOwner(account, {
         programId: TOKEN_PROGRAM_ID,
     });
-    console.log(`account ${account.toBase58()} spl balance:`)
+    console.log(`account ${account.toBase58()} spl balance:`);
     for (let tokenAccount of tokenAccounts.value) {
         const accountData = AccountLayout.decode(tokenAccount.account.data);
         let mintInfo = await getMint(connection, accountData.mint);
-        console.log(`token program: ${TOKEN_PROGRAM_ID.toBase58()}, mint: ${accountData.mint.toBase58()}, decimals: ${mintInfo.decimals}, balance: ${accountData.amount}`);
+        console.log(
+            `token program: ${TOKEN_PROGRAM_ID.toBase58()}, mint: ${accountData.mint.toBase58()}, decimals: ${
+                mintInfo.decimals
+            }, balance: ${accountData.amount}`,
+        );
     }
+}
 
+export async function transferSOL(
+    connection: web3.Connection,
+    from: web3.Keypair,
+    to: web3.PublicKey,
+    amountInLamports: number,
+) {
+    let tx = new web3.Transaction().add(
+        web3.SystemProgram.transfer({
+            fromPubkey: from.publicKey,
+            toPubkey: to,
+            lamports: amountInLamports,
+        }),
+    );
+    let confirm = await web3.sendAndConfirmTransaction(connection, tx, [from]);
+    return confirm;
 }

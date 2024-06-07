@@ -4,7 +4,7 @@ use anchor_spl::token::{self, Mint, Token, TokenAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
-declare_id!("2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu");
+declare_id!("2pN84sZ1F5ByDJBMgN31UX2e8tEusaiDF1GD7kj2b9Hs");
 
 const SECONDS_PER_YEAR: i64 = 60 * 60 * 24 * 365;
 const ADMIN_SETTINGS_SEED: &[u8] = b"settings";

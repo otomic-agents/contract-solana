@@ -1,43 +1,27 @@
-import crypto from "crypto";
-import {
-    Connection,
-    Keypair,
-    PublicKey,
-    SystemProgram,
-    Transaction,
-} from "@solana/web3.js";
-import {
-    Program,
-    Idl,
-    AnchorProvider,
-    setProvider,
-    Wallet,
-    BN
-} from "@coral-xyz/anchor";
-import {
-    getAssociatedTokenAddressSync,
-    ASSOCIATED_TOKEN_PROGRAM_ID
-} from "@solana/spl-token";
-import { keccak_256 } from "@noble/hashes/sha3";
-import { serialize, deserialize } from "v8";
-import * as idl from "../Idl/obridge.json"
-import Monitor from "./Monitor";
+import crypto from 'crypto';
+import { Connection, Keypair, PublicKey, SystemProgram, Transaction } from '@solana/web3.js';
+import { Program, Idl, AnchorProvider, setProvider, Wallet, BN } from '@coral-xyz/anchor';
+import { getAssociatedTokenAddressSync, ASSOCIATED_TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { keccak_256 } from '@noble/hashes/sha3';
+import { serialize, deserialize } from 'v8';
+import * as idl from '../Idl/obridge.json';
+import Monitor from './Monitor';
 
 export type Lock = {
-    hash: Array<number>
-    deadline: BN
-}
+    hash: Array<number>;
+    deadline: BN;
+};
 
 export type ExtraData = {
-    dstChainId: string
-    dstAddress: string
-    dstToken: string
-    dstAmount: string
-    requestor: string
-    lpId: string
-    userSign: string
-    lpSign: string
-}
+    dstChainId: string;
+    dstAddress: string;
+    dstToken: string;
+    dstAmount: string;
+    requestor: string;
+    lpId: string;
+    userSign: string;
+    lpSign: string;
+};
 
 export class ObridgeService {
     connection: Connection;
@@ -84,7 +68,7 @@ export class ObridgeService {
 
     // get the escrow account address by uuid offchain
     getEscrowAccountAddress(uuid: number[]): PublicKey {
-        let [escrow,] = PublicKey.findProgramAddressSync([Buffer.from(uuid)], this.obridgeProgramId);
+        let [escrow] = PublicKey.findProgramAddressSync([Buffer.from(uuid)], this.obridgeProgramId);
         return escrow;
     }
 
@@ -102,9 +86,7 @@ export class ObridgeService {
     }
 
     async sendTransaction(rawTx: string, signers: Keypair[]): Promise<string> {
-        let recoveredTransaction = Transaction.from(
-            Buffer.from(rawTx, 'hex')
-        );
+        let recoveredTransaction = Transaction.from(Buffer.from(rawTx, 'hex'));
 
         recoveredTransaction.sign(...signers);
 
@@ -134,7 +116,7 @@ export class ObridgeService {
         escrow: PublicKey,
         escrowAta: PublicKey,
         mint: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
             .initiate(
@@ -145,7 +127,7 @@ export class ObridgeService {
                 relayLock,
                 transferOutDeadline,
                 refundDeadline,
-                this.encodeExtraData(extraData)
+                this.encodeExtraData(extraData),
             )
             .accounts({
                 payer: this.payer.publicKey,
@@ -162,10 +144,12 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 
     /*
@@ -188,19 +172,10 @@ export class ObridgeService {
         escrow: PublicKey,
         escrowAta: PublicKey,
         mint: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
-            .initiate(
-                uuid,
-                user,
-                amount,
-                lpLock,
-                null,
-                transferInDeadline,
-                refundDeadline,
-                Buffer.from([])
-            )
+            .initiate(uuid, user, amount, lpLock, null, transferInDeadline, refundDeadline, Buffer.from([]))
             .accounts({
                 payer: this.payer.publicKey,
                 from: from,
@@ -216,10 +191,12 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 
     /*
@@ -235,13 +212,10 @@ export class ObridgeService {
         destination: PublicKey,
         escrow: PublicKey,
         escrowAta: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
-            .confirm(
-                uuid,
-                preimage
-            )
+            .confirm(uuid, preimage)
             .accounts({
                 destination: destination,
                 escrow: escrow,
@@ -253,10 +227,12 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 
     /*
@@ -272,13 +248,10 @@ export class ObridgeService {
         destination: PublicKey,
         escrow: PublicKey,
         escrowAta: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
-            .confirm(
-                uuid,
-                preimage
-            )
+            .confirm(uuid, preimage)
             .accounts({
                 destination: destination,
                 escrow: escrow,
@@ -290,10 +263,12 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 
     /*
@@ -307,12 +282,10 @@ export class ObridgeService {
         source: PublicKey,
         escrow: PublicKey,
         escrowAta: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
-            .refund(
-                uuid
-            )
+            .refund(uuid)
             .accounts({
                 source: source,
                 escrow: escrow,
@@ -324,10 +297,12 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 
     /*
@@ -341,12 +316,10 @@ export class ObridgeService {
         source: PublicKey,
         escrow: PublicKey,
         escrowAta: PublicKey,
-        tokenProgramId: PublicKey
+        tokenProgramId: PublicKey,
     ): Promise<string> {
         let tx = await this.program.methods
-            .refund(
-                uuid
-            )
+            .refund(uuid)
             .accounts({
                 source: source,
                 escrow: escrow,
@@ -358,9 +331,11 @@ export class ObridgeService {
         const blockHash = (await this.connection.getLatestBlockhash('finalized')).blockhash;
         tx.recentBlockhash = blockHash;
         tx.feePayer = this.payer.publicKey;
-        return tx.serialize({
-            requireAllSignatures: false,
-            verifySignatures: true
-        }).toString("hex");
+        return tx
+            .serialize({
+                requireAllSignatures: false,
+                verifySignatures: true,
+            })
+            .toString('hex');
     }
 }

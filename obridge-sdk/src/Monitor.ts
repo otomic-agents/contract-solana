@@ -1,9 +1,9 @@
-import { SolanaJSONRPCError, Message } from "@solana/web3.js";
-import { BorshInstructionCoder } from "@coral-xyz/anchor";
-import { ObridgeService } from "./ObridgeService";
+import { SolanaJSONRPCError, Message } from '@solana/web3.js';
+import { BorshInstructionCoder } from '@coral-xyz/anchor';
+import { ObridgeService } from './ObridgeService';
 
 export async function sleep(ms: number) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default class Monitor {
@@ -26,19 +26,24 @@ export default class Monitor {
             let block = await this.obSrv.connection.getBlock(this.lastSlot, {
                 maxSupportedTransactionVersion: 0,
                 rewards: false,
-                transactionDetails: "full",
+                transactionDetails: 'full',
             });
             console.log(`block: ${this.lastSlot}`);
 
             if (block) {
                 for (let tx of block.transactions) {
-                    if (tx.version === "legacy" && !tx.meta?.err) {
+                    if (tx.version === 'legacy' && !tx.meta?.err) {
                         let message = tx.transaction.message as Message;
-                        const isRelatedToProgram = message.accountKeys.some((key) => key.toBase58() === this.obSrv.obridgeProgramId.toBase58());
+                        const isRelatedToProgram = message.accountKeys.some(
+                            (key) => key.toBase58() === this.obSrv.obridgeProgramId.toBase58(),
+                        );
                         if (isRelatedToProgram) {
                             for (let ix of message.instructions) {
-                                if (message.accountKeys[ix.programIdIndex].toBase58() === this.obSrv.obridgeProgramId.toBase58()) {
-                                    let decodedData = this.coder.decode(ix.data, "base58");
+                                if (
+                                    message.accountKeys[ix.programIdIndex].toBase58() ===
+                                    this.obSrv.obridgeProgramId.toBase58()
+                                ) {
+                                    let decodedData = this.coder.decode(ix.data, 'base58');
                                     console.log(decodedData);
                                     if (decodedData) {
                                         let extraData = (decodedData.data as any).extraData;
@@ -58,9 +63,11 @@ export default class Monitor {
             setTimeout(() => {
                 this.start();
             }, 400);
-
         } catch (err) {
-            if ((err as SolanaJSONRPCError).message === `failed to get confirmed block: Block not available for slot ${this.lastSlot}`) {
+            if (
+                (err as SolanaJSONRPCError).message ===
+                `failed to get confirmed block: Block not available for slot ${this.lastSlot}`
+            ) {
                 setTimeout(() => {
                     this.start();
                 }, 400);

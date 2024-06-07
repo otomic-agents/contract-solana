@@ -1,4 +1,4 @@
-import { web3 } from "@coral-xyz/anchor";
+import { web3 } from '@coral-xyz/anchor';
 import {
     createMint,
     getMint,
@@ -9,16 +9,16 @@ import {
     TOKEN_PROGRAM_ID,
     AccountLayout,
     transfer,
-} from "@solana/spl-token";
-import dotenv from "dotenv";
+} from '@solana/spl-token';
+import dotenv from 'dotenv';
 
-import { printConsoleSeparator, explorerURL, sleep } from "./utils";
+import { printConsoleSeparator, explorerURL, sleep } from './utils';
 
 dotenv.config();
 
 async function initConnectionAndPayer() {
-    const connection = new web3.Connection(web3.clusterApiUrl("devnet"), "confirmed");
-    const secret = JSON.parse(process.env.PRIVATE_KEY ?? "") as number[];
+    const connection = new web3.Connection(web3.clusterApiUrl('devnet'), 'confirmed');
+    const secret = JSON.parse(process.env.PRIVATE_KEY ?? '') as number[];
     const secretKey = Uint8Array.from(secret);
     const payer = web3.Keypair.fromSecretKey(secretKey);
 
@@ -29,8 +29,8 @@ async function initConnectionAndPayer() {
 
     return {
         connection: connection,
-        payer: payer
-    }
+        payer: payer,
+    };
 }
 
 /*
@@ -42,25 +42,22 @@ async function CreateMintProgram(connection: web3.Connection, payer: web3.Keypai
         payer,
         payer.publicKey,
         payer.publicKey,
-        9 // We are using 9 to match the CLI decimal default exactly
+        9, // We are using 9 to match the CLI decimal default exactly
     );
 
     const url = explorerURL({
-        address: mint.toBase58()
-    })
+        address: mint.toBase58(),
+    });
     console.log(`created a MINT successful, check it out: ${url}`);
 
-    console.log("check MINT details ... ")
+    console.log('check MINT details ... ');
     while (true) {
         try {
-            const mintInfo = await getMint(
-                connection,
-                mint
-            )
+            const mintInfo = await getMint(connection, mint);
             console.log(mintInfo);
             break;
         } catch (err) {
-            if ((err as TokenError).name === "TokenAccountNotFoundError") {
+            if ((err as TokenError).name === 'TokenAccountNotFoundError') {
                 console.log(`get error: TokenAccountNotFoundError, wait for 5 seconds and check again`);
                 await sleep(1000 * 5);
             } else {
@@ -74,19 +71,16 @@ async function CreateMintProgram(connection: web3.Connection, payer: web3.Keypai
 /*
     set payer as the generated ata token account's owner 
 */
-async function getATAAccountAndMintTo(connection: web3.Connection, mint: web3.PublicKey, mintAmount: number, payer: web3.Keypair) {
-    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        payer,
-        mint,
-        payer.publicKey
-    );
+async function getATAAccountAndMintTo(
+    connection: web3.Connection,
+    mint: web3.PublicKey,
+    mintAmount: number,
+    payer: web3.Keypair,
+) {
+    let ataTokenAccount = await getOrCreateAssociatedTokenAccount(connection, payer, mint, payer.publicKey);
     console.log(`created a ataTokenAccount ${ataTokenAccount.address} owned by ${payer.publicKey} for token ${mint}`);
 
-    ataTokenAccount = await getAccount(
-        connection,
-        ataTokenAccount.address
-    );
+    ataTokenAccount = await getAccount(connection, ataTokenAccount.address);
     console.log(`before mintTo, ata account ${ataTokenAccount.address} balance: ${ataTokenAccount.amount}`);
 
     await mintTo(
@@ -95,82 +89,53 @@ async function getATAAccountAndMintTo(connection: web3.Connection, mint: web3.Pu
         mint,
         ataTokenAccount.address,
         payer.publicKey,
-        mintAmount // because decimals for the mint are set to 9 
+        mintAmount, // because decimals for the mint are set to 9
     );
 
-    ataTokenAccount = await getAccount(
-        connection,
-        ataTokenAccount.address
-    );
+    ataTokenAccount = await getAccount(connection, ataTokenAccount.address);
     console.log(`after mintTo, ata account ${ataTokenAccount.address} balance: ${ataTokenAccount.amount}`);
 
     return ataTokenAccount;
 }
 
 async function checkAllTokensByOwner(connection: web3.Connection, owner: web3.PublicKey) {
-    const tokenAccounts = await connection.getTokenAccountsByOwner(
-        owner,
-        {
-            programId: TOKEN_PROGRAM_ID,
-        }
-    );
+    const tokenAccounts = await connection.getTokenAccountsByOwner(owner, {
+        programId: TOKEN_PROGRAM_ID,
+    });
 
     console.log(`Owned token by ${owner}`);
-    console.log("Token                                         Balance");
-    console.log("------------------------------------------------------------");
+    console.log('Token                                         Balance');
+    console.log('------------------------------------------------------------');
     tokenAccounts.value.forEach((tokenAccount) => {
         const accountData = AccountLayout.decode(tokenAccount.account.data);
         console.log(`${accountData.mint}   ${accountData.amount}`);
-    })
+    });
 }
 
 /*
     payer will be the sender
 */
-async function transferSPLToken(connection: web3.Connection, mint: web3.PublicKey, to: web3.PublicKey, amount: number, payer: web3.Keypair) {
-    let fromAtaTokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        payer,
-        mint,
-        payer.publicKey
-    );
+async function transferSPLToken(
+    connection: web3.Connection,
+    mint: web3.PublicKey,
+    to: web3.PublicKey,
+    amount: number,
+    payer: web3.Keypair,
+) {
+    let fromAtaTokenAccount = await getOrCreateAssociatedTokenAccount(connection, payer, mint, payer.publicKey);
 
-    let toAtaTokenAccount = await getOrCreateAssociatedTokenAccount(
-        connection,
-        payer,
-        mint,
-        to
-    );
+    let toAtaTokenAccount = await getOrCreateAssociatedTokenAccount(connection, payer, mint, to);
 
-    let fromAcount = await  getAccount(
-        connection,
-        fromAtaTokenAccount.address
-    );
+    let fromAcount = await getAccount(connection, fromAtaTokenAccount.address);
     console.log(`before transfer, from account ${fromAcount.address} balance: ${fromAcount.amount}`);
-    let toAcount = await  getAccount(
-        connection,
-        toAtaTokenAccount.address
-    );
+    let toAcount = await getAccount(connection, toAtaTokenAccount.address);
     console.log(`before transfer, to account ${toAcount.address} balance: ${toAcount.amount}`);
 
-    await transfer(
-        connection, 
-        payer,
-        fromAtaTokenAccount.address,
-        toAtaTokenAccount.address,
-        payer,
-        amount
-    );
+    await transfer(connection, payer, fromAtaTokenAccount.address, toAtaTokenAccount.address, payer, amount);
 
-    fromAcount = await  getAccount(
-        connection,
-        fromAtaTokenAccount.address
-    );
+    fromAcount = await getAccount(connection, fromAtaTokenAccount.address);
     console.log(`after transfer, from account ${fromAcount.address} balance: ${fromAcount.amount}`);
-    toAcount = await  getAccount(
-        connection,
-        toAtaTokenAccount.address
-    );
+    toAcount = await getAccount(connection, toAtaTokenAccount.address);
     console.log(`after transfer, to account ${toAcount.address} balance: ${toAcount.amount}`);
 }
 

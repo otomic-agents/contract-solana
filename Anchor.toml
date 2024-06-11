@@ -5,10 +5,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-obridge = "2pN84sZ1F5ByDJBMgN31UX2e8tEusaiDF1GD7kj2b9Hs"
+obridge = "FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo"
 
 [programs.devnet]
-obridge = "2pN84sZ1F5ByDJBMgN31UX2e8tEusaiDF1GD7kj2b9Hs"
+obridge = "FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo"
 
 [registry]
 url = "https://api.apr.dev"

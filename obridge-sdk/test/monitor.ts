@@ -5,7 +5,7 @@ import 'dotenv/config';
 
 async function main() {
     const connection = new Connection('https://api.devnet.solana.com', 'finalized');
-    const obridgeProgramId = new PublicKey('2Xii6vHBc47isGv7ecXXdzcJbsPbH5rbHTsYuvycByRu');
+    const obridgeProgramId = new PublicKey('FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo');
     const payerPrivateKey = process.env.PAYER_PRIVATE_KEY;
     if (!payerPrivateKey) {
         console.error('PAYER_PRIVATE_KEY is not set');

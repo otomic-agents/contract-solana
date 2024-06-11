@@ -147,14 +147,6 @@ pub mod obridge {
             escrow.lock2.clone().unwrap().check(&hash, timestamp)?;
         }
 
-        if escrow.sol_amount > 0 {
-            escrow.sub_lamports(escrow.sol_amount)?;
-            ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
-            ctx.accounts
-                .to
-                .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
-        }
-
         let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
 
         token::transfer(
@@ -182,6 +174,14 @@ pub mod obridge {
             ),
             escrow.token_amount - escrow.token_fee,
         )?;
+
+        if escrow.sol_amount > 0 {
+            escrow.sub_lamports(escrow.sol_amount)?;
+            ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
+            ctx.accounts
+                .to
+                .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
+        }
 
         escrow.sol_amount = 0;
         escrow.token_amount = 0;

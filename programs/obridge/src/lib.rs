@@ -194,11 +194,6 @@ pub mod obridge {
 
         require!(timestamp > escrow.refund_time, Errors::NotRefundable);
 
-        if escrow.sol_amount > 0 {
-            escrow.sub_lamports(escrow.sol_amount)?;
-            ctx.accounts.from.add_lamports(escrow.sol_amount)?;
-        }
-
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -211,6 +206,11 @@ pub mod obridge {
             ),
             escrow.token_amount,
         )?;
+
+        if escrow.sol_amount > 0 {
+            escrow.sub_lamports(escrow.sol_amount)?;
+            ctx.accounts.from.add_lamports(escrow.sol_amount)?;
+        }
 
         escrow.sol_amount = 0;
         escrow.token_amount = 0;

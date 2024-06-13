@@ -26,8 +26,11 @@ async function main() {
 
     console.log(`obridge program id: ${obridge.programId.toBase58()}`);
 
+    let tx;
+
+    // set admin
     let [adminSettingsPubKey] = PublicKey.findProgramAddressSync([Buffer.from('settings')], obridge.programId);
-    let tx = await obridge.methods
+    tx = await obridge.methods
         .initialize(admin.publicKey)
         .accounts({
             payer: payer.publicKey,
@@ -38,6 +41,7 @@ async function main() {
 
     console.log(`successfully initialized program with tx: ${tx}`);
 
+    // set fee recepient
     tx = await obridge.methods
         .setFeeRecepient()
         .accounts({
@@ -49,6 +53,18 @@ async function main() {
         .rpc();
 
     console.log(`successfully set fee recepient tx: ${tx}`);
+
+    // set fee rate to 10%
+    tx = await obridge.methods
+        .setFeeRate(1000)
+        .accounts({
+            admin: admin.publicKey,
+            adminSettings: adminSettingsPubKey,
+        })
+        .signers([admin])
+        .rpc();
+
+    console.log(`set fee rate 10% tx: ${tx}`);
 
     console.log('Program config successfully');
 }

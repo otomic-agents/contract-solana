@@ -453,6 +453,7 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         const tx3 = await program.methods
             .confirm(uuid1, preimage)
             .accounts({
+                from: user.publicKey,
                 to: lp.publicKey,
                 destination: lpAtaTokenMint1Account.address,
                 escrow: escrow1,
@@ -488,6 +489,7 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         const tx4 = await program.methods
             .confirm(uuid2, preimage)
             .accounts({
+                from: lp.publicKey,
                 to: user.publicKey,
                 destination: userAtaTokenMint2Account.address,
                 escrow: escrow2,
@@ -511,14 +513,14 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
         expect(userMint1BalBefore.sub(userMint1BalAfter).toString()).to.be.eq(tokenAmount.toString());
         expect(userMint2BalAfter.sub(userMint2BalBefore).toString()).to.be.eq(tokenAmountBack.sub(feeMint2).toString());
-        expect(userSOLBalAfter.sub(userSOLBalBefore).toString()).to.be.eq(solAmountBack.sub(feeSOL).toString());
+        expect(userSOLBalAfter.sub(userSOLBalBefore).toNumber()).to.be.greaterThan(solAmountBack.sub(feeSOL).toNumber());
 
         let lpMint1BalAfter = new BN((await getAccount(connection, lpAtaTokenMint1Account.address)).amount.toString());
         let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());
         let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
         expect(lpMint1BalAfter.sub(lpMint1BalBefore).toString()).to.be.eq(tokenAmount.sub(feeMint1).toString());
         expect(lpMint2BalBefore.sub(lpMint2BalAfter).toString()).to.be.eq(tokenAmountBack.toString());
-        expect(lpSOLBalBefore.sub(lpSOLBalAfter).toString()).to.be.eq(solAmountBack.toString());
+        expect(lpSOLBalBefore.sub(lpSOLBalAfter).toNumber()).to.be.lessThan(solAmountBack.toNumber());
 
         let feeRecepientMint1BalAfter = new BN(
             (await getAccount(connection, feeMin1Destination.address)).amount.toString(),
@@ -895,12 +897,12 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         );
         let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
         expect(userMint1BalBefore.toString()).to.be.eq(userMint1BalAfter.toString());
-        expect(userSOLBalAfter.toString()).to.be.eq(userSOLBalBefore.toString());
+        expect(userSOLBalAfter.toNumber()).to.be.greaterThan(userSOLBalBefore.toNumber());
 
         let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());
         let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
         expect(lpMint2BalAfter.toString()).to.be.eq(lpMint2BalBefore.toString());
-        expect(lpSOLBalBefore.toString()).to.be.eq(lpSOLBalAfter.toString());
+        expect(lpSOLBalBefore.toNumber()).to.be.lessThan(lpSOLBalAfter.toNumber());
     });
 
     it('nonexisting account test', async () => {
@@ -1086,6 +1088,7 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         const tx3 = await program.methods
             .confirm(uuid1, preimage)
             .accounts({
+                from: user.publicKey,
                 to: lp.publicKey,
                 destination: lpAtaTokenMint1Account.address,
                 escrow: escrow1,
@@ -1121,6 +1124,7 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         const tx4 = await program.methods
             .confirm(uuid2, preimage)
             .accounts({
+                from: lp.publicKey,
                 to: user.publicKey,
                 destination: userAtaTokenMint2Account.address,
                 escrow: escrow2,

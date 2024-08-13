@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, Token, TokenAccount};
+use anchor_spl::token::{self, Mint, Token, TokenAccount, CloseAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
@@ -175,16 +175,34 @@ pub mod obridge {
             escrow.token_amount - escrow.token_fee,
         )?;
 
+        // close escrow ata account and transfer remaining tokens to "from" account
+        token::close_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.escrow_ata.to_account_info(),
+                    destination: ctx.accounts.from.to_account_info(),
+                    authority: escrow.to_account_info(),
+                },
+                seeds,
+            ),
+        )?;
+
+        // close escrow account
+        let escrow_lamports = escrow.to_account_info().lamports();
         if escrow.sol_amount > 0 {
-            escrow.sub_lamports(escrow.sol_amount)?;
             ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
-            ctx.accounts
-                .to
-                .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
+            ctx.accounts.to.add_lamports(escrow.sol_amount - escrow.sol_fee)?;
+            ctx.accounts.from.add_lamports(escrow_lamports - escrow.sol_amount)?;
+
+        } else {
+            ctx.accounts.from.add_lamports(escrow_lamports)?;
         }
 
-        escrow.sol_amount = 0;
-        escrow.token_amount = 0;
+        escrow.sub_lamports(escrow_lamports)?;
+        escrow.to_account_info().assign(&system_program::ID);
+        escrow.to_account_info().realloc(0, false)?;
+
         Ok(())
     }
 
@@ -194,6 +212,8 @@ pub mod obridge {
 
         require!(timestamp > escrow.refund_time, Errors::NotRefundable);
 
+        let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
+
         token::transfer(
             CpiContext::new_with_signer(
                 ctx.accounts.token_program.to_account_info(),
@@ -202,18 +222,33 @@ pub mod obridge {
                     to: ctx.accounts.source.to_account_info(),
                     authority: escrow.to_account_info(),
                 },
-                &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]],
+                seeds,
             ),
             escrow.token_amount,
         )?;
 
-        if escrow.sol_amount > 0 {
-            escrow.sub_lamports(escrow.sol_amount)?;
-            ctx.accounts.from.add_lamports(escrow.sol_amount)?;
-        }
+        // close escrow ata account and transfer remaining tokens to "from" account
+        token::close_account(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                CloseAccount {
+                    account: ctx.accounts.escrow_ata.to_account_info(),
+                    destination: ctx.accounts.from.to_account_info(),
+                    authority: escrow.to_account_info(),
+                },
+                seeds,
+            ),
+        )?;
 
-        escrow.sol_amount = 0;
-        escrow.token_amount = 0;
+        // close escrow account
+        
+        let escrow_lamports = escrow.to_account_info().lamports();
+        ctx.accounts.from.add_lamports(escrow_lamports)?;
+        
+        escrow.sub_lamports(escrow_lamports)?;
+        escrow.to_account_info().assign(&system_program::ID);
+        escrow.to_account_info().realloc(0, false)?;        
+        
         Ok(())
     }
 }
@@ -351,6 +386,8 @@ pub struct Prepare<'info> {
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 16])]
 pub struct Confirm<'info> {
+    #[account(mut)]
+    pub from: SystemAccount<'info>,
     /// CHECK: value recepient
     #[account(mut)]
     pub to: UncheckedAccount<'info>,
@@ -361,6 +398,7 @@ pub struct Confirm<'info> {
         mut,
         seeds=[&uuid],
         bump,
+        has_one = from @ Errors::AccountMismatch,
         has_one = to @ Errors::AccountMismatch,
         has_one = escrow_ata @ Errors::AccountMismatch,
         has_one = token_program @ Errors::AccountMismatch,

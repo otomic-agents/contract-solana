@@ -1,9 +1,13 @@
 
 .anchor
 .DS_Store
-target
 **/*.rs.bk
 node_modules
 test-ledger
 .yarn
 .env
+
+target/deploy/obridge-keypair.json
+target/release
+target/sbf-solana-solana
+target/.rustc_info.json

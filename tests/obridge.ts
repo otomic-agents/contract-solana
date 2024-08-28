@@ -513,7 +513,9 @@ describe('SPL A token <-> SPL B token + SOL', () => {
         let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
         expect(userMint1BalBefore.sub(userMint1BalAfter).toString()).to.be.eq(tokenAmount.toString());
         expect(userMint2BalAfter.sub(userMint2BalBefore).toString()).to.be.eq(tokenAmountBack.sub(feeMint2).toString());
-        expect(userSOLBalAfter.sub(userSOLBalBefore).toNumber()).to.be.greaterThan(solAmountBack.sub(feeSOL).toNumber());
+        expect(userSOLBalAfter.sub(userSOLBalBefore).toNumber()).to.be.greaterThan(
+            solAmountBack.sub(feeSOL).toNumber(),
+        );
 
         let lpMint1BalAfter = new BN((await getAccount(connection, lpAtaTokenMint1Account.address)).amount.toString());
         let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());

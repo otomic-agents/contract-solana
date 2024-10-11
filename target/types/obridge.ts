@@ -197,7 +197,7 @@ export type Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
         },
@@ -214,30 +214,14 @@ export type Obridge = {
           "type": "u64"
         },
         {
-          "name": "lock1",
+          "name": "lock",
           "type": {
             "defined": "Lock"
           }
         },
         {
-          "name": "lock2",
-          "type": {
-            "option": {
-              "defined": "Lock"
-            }
-          }
-        },
-        {
-          "name": "deadline",
-          "type": "i64"
-        },
-        {
-          "name": "refundTime",
-          "type": "i64"
-        },
-        {
-          "name": "extraData",
-          "type": "bytes"
+          "name": "isOut",
+          "type": "bool"
         },
         {
           "name": "memo",
@@ -248,6 +232,11 @@ export type Obridge = {
     {
       "name": "confirm",
       "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
         {
           "name": "from",
           "isMut": true,
@@ -305,7 +294,7 @@ export type Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
         },
@@ -317,6 +306,10 @@ export type Obridge = {
               32
             ]
           }
+        },
+        {
+          "name": "isOut",
+          "type": "bool"
         }
       ]
     },
@@ -360,9 +353,13 @@ export type Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
+        },
+        {
+          "name": "isOut",
+          "type": "bool"
         }
       ]
     }
@@ -446,26 +443,10 @@ export type Obridge = {
             "type": "u64"
           },
           {
-            "name": "lock1",
+            "name": "lock",
             "type": {
               "defined": "Lock"
             }
-          },
-          {
-            "name": "lock2",
-            "type": {
-              "option": {
-                "defined": "Lock"
-              }
-            }
-          },
-          {
-            "name": "refundTime",
-            "type": "i64"
-          },
-          {
-            "name": "extraData",
-            "type": "bytes"
           }
         ]
       }
@@ -487,7 +468,19 @@ export type Obridge = {
             }
           },
           {
-            "name": "deadline",
+            "name": "agreementReachedTime",
+            "type": "i64"
+          },
+          {
+            "name": "expectedSingleStepTime",
+            "type": "i64"
+          },
+          {
+            "name": "tolerantSingleStepTime",
+            "type": "i64"
+          },
+          {
+            "name": "earliestRefundTime",
             "type": "i64"
           }
         ]
@@ -507,41 +500,36 @@ export type Obridge = {
     },
     {
       "code": 6002,
-      "name": "FailedToUnlock",
-      "msg": "failed to unlock"
-    },
-    {
-      "code": 6003,
       "name": "InvalidAmount",
       "msg": "invalid amount"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "InvalidFeeRate",
       "msg": "invalid fee rate"
     },
     {
+      "code": 6004,
+      "name": "InvalidSender",
+      "msg": "invalid sender"
+    },
+    {
       "code": 6005,
-      "name": "InvalidTimelock",
-      "msg": "invalid timelock"
+      "name": "InvalidRefundTime",
+      "msg": "invalid refund time"
     },
     {
       "code": 6006,
-      "name": "InvalidDestination",
-      "msg": "invalid destination"
-    },
-    {
-      "code": 6007,
       "name": "DeadlineExceeded",
       "msg": "deadline exceeded"
     },
     {
-      "code": 6008,
+      "code": 6007,
       "name": "PreimageMismatch",
       "msg": "preimage mismatch"
     },
     {
-      "code": 6009,
+      "code": 6008,
       "name": "NotRefundable",
       "msg": "not refundable yet"
     }
@@ -747,7 +735,7 @@ export const IDL: Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
         },
@@ -764,30 +752,14 @@ export const IDL: Obridge = {
           "type": "u64"
         },
         {
-          "name": "lock1",
+          "name": "lock",
           "type": {
             "defined": "Lock"
           }
         },
         {
-          "name": "lock2",
-          "type": {
-            "option": {
-              "defined": "Lock"
-            }
-          }
-        },
-        {
-          "name": "deadline",
-          "type": "i64"
-        },
-        {
-          "name": "refundTime",
-          "type": "i64"
-        },
-        {
-          "name": "extraData",
-          "type": "bytes"
+          "name": "isOut",
+          "type": "bool"
         },
         {
           "name": "memo",
@@ -798,6 +770,11 @@ export const IDL: Obridge = {
     {
       "name": "confirm",
       "accounts": [
+        {
+          "name": "payer",
+          "isMut": true,
+          "isSigner": true
+        },
         {
           "name": "from",
           "isMut": true,
@@ -855,7 +832,7 @@ export const IDL: Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
         },
@@ -867,6 +844,10 @@ export const IDL: Obridge = {
               32
             ]
           }
+        },
+        {
+          "name": "isOut",
+          "type": "bool"
         }
       ]
     },
@@ -910,9 +891,13 @@ export const IDL: Obridge = {
           "type": {
             "array": [
               "u8",
-              16
+              32
             ]
           }
+        },
+        {
+          "name": "isOut",
+          "type": "bool"
         }
       ]
     }
@@ -996,26 +981,10 @@ export const IDL: Obridge = {
             "type": "u64"
           },
           {
-            "name": "lock1",
+            "name": "lock",
             "type": {
               "defined": "Lock"
             }
-          },
-          {
-            "name": "lock2",
-            "type": {
-              "option": {
-                "defined": "Lock"
-              }
-            }
-          },
-          {
-            "name": "refundTime",
-            "type": "i64"
-          },
-          {
-            "name": "extraData",
-            "type": "bytes"
           }
         ]
       }
@@ -1037,7 +1006,19 @@ export const IDL: Obridge = {
             }
           },
           {
-            "name": "deadline",
+            "name": "agreementReachedTime",
+            "type": "i64"
+          },
+          {
+            "name": "expectedSingleStepTime",
+            "type": "i64"
+          },
+          {
+            "name": "tolerantSingleStepTime",
+            "type": "i64"
+          },
+          {
+            "name": "earliestRefundTime",
             "type": "i64"
           }
         ]
@@ -1057,41 +1038,36 @@ export const IDL: Obridge = {
     },
     {
       "code": 6002,
-      "name": "FailedToUnlock",
-      "msg": "failed to unlock"
-    },
-    {
-      "code": 6003,
       "name": "InvalidAmount",
       "msg": "invalid amount"
     },
     {
-      "code": 6004,
+      "code": 6003,
       "name": "InvalidFeeRate",
       "msg": "invalid fee rate"
     },
     {
+      "code": 6004,
+      "name": "InvalidSender",
+      "msg": "invalid sender"
+    },
+    {
       "code": 6005,
-      "name": "InvalidTimelock",
-      "msg": "invalid timelock"
+      "name": "InvalidRefundTime",
+      "msg": "invalid refund time"
     },
     {
       "code": 6006,
-      "name": "InvalidDestination",
-      "msg": "invalid destination"
-    },
-    {
-      "code": 6007,
       "name": "DeadlineExceeded",
       "msg": "deadline exceeded"
     },
     {
-      "code": 6008,
+      "code": 6007,
       "name": "PreimageMismatch",
       "msg": "preimage mismatch"
     },
     {
-      "code": 6009,
+      "code": 6008,
       "name": "NotRefundable",
       "msg": "not refundable yet"
     }

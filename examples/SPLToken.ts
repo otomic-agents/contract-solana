@@ -1,4 +1,4 @@
-import { web3 } from '@coral-xyz/anchor';
+import { web3 } from "@coral-xyz/anchor";
 import {
     createMint,
     getMint,
@@ -9,16 +9,16 @@ import {
     TOKEN_PROGRAM_ID,
     AccountLayout,
     transfer,
-} from '@solana/spl-token';
-import dotenv from 'dotenv';
+} from "@solana/spl-token";
+import dotenv from "dotenv";
 
-import { printConsoleSeparator, explorerURL, sleep } from './utils';
+import { printConsoleSeparator, explorerURL, sleep } from "./utils";
 
 dotenv.config();
 
 async function initConnectionAndPayer() {
-    const connection = new web3.Connection(web3.clusterApiUrl('devnet'), 'confirmed');
-    const secret = JSON.parse(process.env.PRIVATE_KEY ?? '') as number[];
+    const connection = new web3.Connection(web3.clusterApiUrl("devnet"), "confirmed");
+    const secret = JSON.parse(process.env.PRIVATE_KEY ?? "") as number[];
     const secretKey = Uint8Array.from(secret);
     const payer = web3.Keypair.fromSecretKey(secretKey);
 
@@ -50,14 +50,14 @@ async function CreateMintProgram(connection: web3.Connection, payer: web3.Keypai
     });
     console.log(`created a MINT successful, check it out: ${url}`);
 
-    console.log('check MINT details ... ');
+    console.log("check MINT details ... ");
     while (true) {
         try {
             const mintInfo = await getMint(connection, mint);
             console.log(mintInfo);
             break;
         } catch (err) {
-            if ((err as TokenError).name === 'TokenAccountNotFoundError') {
+            if ((err as TokenError).name === "TokenAccountNotFoundError") {
                 console.log(`get error: TokenAccountNotFoundError, wait for 5 seconds and check again`);
                 await sleep(1000 * 5);
             } else {
@@ -104,8 +104,8 @@ async function checkAllTokensByOwner(connection: web3.Connection, owner: web3.Pu
     });
 
     console.log(`Owned token by ${owner}`);
-    console.log('Token                                         Balance');
-    console.log('------------------------------------------------------------');
+    console.log("Token                                         Balance");
+    console.log("------------------------------------------------------------");
     tokenAccounts.value.forEach((tokenAccount) => {
         const accountData = AccountLayout.decode(tokenAccount.account.data);
         console.log(`${accountData.mint}   ${accountData.amount}`);

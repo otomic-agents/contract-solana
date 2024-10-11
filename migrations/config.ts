@@ -1,13 +1,13 @@
-import { Connection, Keypair, PublicKey, SystemProgram } from '@solana/web3.js';
-import { Program, Idl, AnchorProvider, setProvider, Wallet } from '@coral-xyz/anchor';
-import * as idl from '../target/idl/obridge.json';
-import * as dotenv from 'dotenv';
+import { Connection, Keypair, PublicKey, SystemProgram } from "@solana/web3.js";
+import { Program, Idl, AnchorProvider, setProvider, Wallet } from "@coral-xyz/anchor";
+import * as idl from "../target/idl/obridge.json";
+import * as dotenv from "dotenv";
 
 dotenv.config();
 
 async function main() {
-    const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
-    const obridgeProgramId = new PublicKey('FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo');
+    const connection = new Connection("https://api.devnet.solana.com", "confirmed");
+    const obridgeProgramId = new PublicKey("FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo");
 
     const payerSecret = JSON.parse(process.env.PRIVATE_KEY) as number[];
     const payer = Keypair.fromSecretKey(Uint8Array.from(payerSecret));
@@ -29,7 +29,7 @@ async function main() {
     let tx;
 
     // set admin
-    let [adminSettingsPubKey] = PublicKey.findProgramAddressSync([Buffer.from('settings')], obridge.programId);
+    let [adminSettingsPubKey] = PublicKey.findProgramAddressSync([Buffer.from("settings")], obridge.programId);
     tx = await obridge.methods
         .initialize(admin.publicKey)
         .accounts({
@@ -66,7 +66,7 @@ async function main() {
 
     console.log(`set fee rate 10% tx: ${tx}`);
 
-    console.log('Program config successfully');
+    console.log("Program config successfully");
 }
 
 main();

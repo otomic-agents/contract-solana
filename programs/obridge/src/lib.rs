@@ -1,12 +1,11 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, CloseAccount};
+use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
 declare_id!("FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo");
 
-const SECONDS_PER_YEAR: i64 = 60 * 60 * 24 * 365;
 const ADMIN_SETTINGS_SEED: &[u8] = b"settings";
 const TOKEN_SETTINGS_SEED_PREFIX: &[u8] = b"token";
 
@@ -47,21 +46,31 @@ pub mod obridge {
 
     pub fn prepare(
         ctx: Context<Prepare>,
-        _uuid: [u8; 16],
+        _uuid: [u8; 32],
         to: Pubkey,
         sol_amount: u64,
         token_amount: u64,
-        lock1: Lock,
-        lock2: Option<Lock>,
-        deadline: i64,
-        refund_time: i64,
-        extra_data: Vec<u8>,
+        lock: Lock,
+        _is_out: bool,
         _memo: Vec<u8>,
     ) -> Result<()> {
+        require!(
+            ctx.accounts.payer.key() == ctx.accounts.from.key(),
+            Errors::InvalidSender
+        );
+
         require!(token_amount > 0, Errors::InvalidAmount);
 
         let timestamp = Clock::get()?.unix_timestamp;
-        require!(timestamp <= deadline, Errors::DeadlineExceeded);
+
+        let timelock = if _is_out {
+            lock.agreement_reached_time + 1 * lock.expected_single_step_time
+        } else {
+            lock.agreement_reached_time + 2 * lock.expected_single_step_time
+        };
+        require!(timestamp <= timelock, Errors::DeadlineExceeded);
+
+        lock.check_refund_time()?;
 
         let fee_rate_bp = ctx.accounts.admin_settings.fee_rate_bp as u64;
         let mut sol_fee: u64 = 0;
@@ -105,46 +114,67 @@ pub mod obridge {
         escrow.to = to;
         escrow.token_program = ctx.accounts.token_program.key();
         escrow.mint = ctx.accounts.mint.key();
-        escrow.escrow_ata = ctx.accounts.escrow_ata.key();
         escrow.source = ctx.accounts.source.key();
+        escrow.escrow_ata = ctx.accounts.escrow_ata.key();
         escrow.sol_amount = sol_amount;
         escrow.token_amount = token_amount;
         escrow.sol_fee = sol_fee;
         escrow.token_fee = token_fee;
-
-        let max_timelock = timestamp + SECONDS_PER_YEAR;
-        require!(refund_time <= max_timelock, Errors::InvalidTimelock);
-        require!(
-            lock1.deadline > timestamp && lock1.deadline <= refund_time,
-            Errors::InvalidTimelock
-        );
-        escrow.lock1 = lock1;
-        escrow.refund_time = refund_time;
-
-        if lock2.is_some() {
-            let lock = lock2.unwrap();
-            require!(
-                lock.deadline > timestamp && lock.deadline <= refund_time,
-                Errors::InvalidTimelock
-            );
-            escrow.lock2 = Some(lock);
-        }
-
-        escrow.extra_data = extra_data;
+        escrow.lock = lock;
         Ok(())
     }
 
-    pub fn confirm(ctx: Context<Confirm>, uuid: [u8; 16], preimage: [u8; 32]) -> Result<()> {
+    pub fn confirm(
+        ctx: Context<Confirm>,
+        uuid: [u8; 32],
+        preimage: [u8; 32],
+        _is_out: bool,
+    ) -> Result<()> {
         let escrow = &mut ctx.accounts.escrow;
         let hash = keccak::hash(&preimage).0;
         let timestamp = Clock::get()?.unix_timestamp;
 
-        let unlock_result = escrow.lock1.check(&hash, timestamp);
-        if unlock_result.is_err() {
-            if escrow.lock2.is_none() {
-                return unlock_result;
+        escrow.lock.check_hashlock(&hash)?;
+
+        if _is_out {
+            // payer is the from account
+            if ctx.accounts.payer.key() == ctx.accounts.from.key() {
+                let timelock =
+                    escrow.lock.agreement_reached_time + 3 * escrow.lock.expected_single_step_time;
+                require!(timestamp <= timelock, Errors::DeadlineExceeded);
+            } else {
+                // payer is not the from account
+                let start_timelock = escrow.lock.agreement_reached_time
+                    + 3 * escrow.lock.expected_single_step_time
+                    + 2 * escrow.lock.tolerant_single_step_time;
+                let end_timelock = escrow.lock.agreement_reached_time
+                    + 3 * escrow.lock.expected_single_step_time
+                    + 3 * escrow.lock.tolerant_single_step_time;
+                require!(
+                    start_timelock <= timestamp && timestamp <= end_timelock,
+                    Errors::DeadlineExceeded
+                );
             }
-            escrow.lock2.clone().unwrap().check(&hash, timestamp)?;
+        } else {
+            // payer is the from account
+            if ctx.accounts.payer.key() == ctx.accounts.from.key() {
+                let timelock = escrow.lock.agreement_reached_time
+                    + 3 * escrow.lock.expected_single_step_time
+                    + 1 * escrow.lock.tolerant_single_step_time;
+                require!(timestamp <= timelock, Errors::DeadlineExceeded);
+            } else {
+                // payer is not the from account
+                let start_timelock = escrow.lock.agreement_reached_time
+                    + 3 * escrow.lock.expected_single_step_time
+                    + 1 * escrow.lock.tolerant_single_step_time;
+                let end_timelock = escrow.lock.agreement_reached_time
+                    + 3 * escrow.lock.expected_single_step_time
+                    + 2 * escrow.lock.tolerant_single_step_time;
+                require!(
+                    start_timelock <= timestamp && timestamp <= end_timelock,
+                    Errors::DeadlineExceeded
+                );
+            }
         }
 
         let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
@@ -176,25 +206,26 @@ pub mod obridge {
         )?;
 
         // close escrow ata account and transfer remaining tokens to "from" account
-        token::close_account(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                CloseAccount {
-                    account: ctx.accounts.escrow_ata.to_account_info(),
-                    destination: ctx.accounts.from.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                seeds,
-            ),
-        )?;
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_ata.to_account_info(),
+                destination: ctx.accounts.from.to_account_info(),
+                authority: escrow.to_account_info(),
+            },
+            seeds,
+        ))?;
 
         // close escrow account
         let escrow_lamports = escrow.to_account_info().lamports();
         if escrow.sol_amount > 0 {
             ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
-            ctx.accounts.to.add_lamports(escrow.sol_amount - escrow.sol_fee)?;
-            ctx.accounts.from.add_lamports(escrow_lamports - escrow.sol_amount)?;
-
+            ctx.accounts
+                .to
+                .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
+            ctx.accounts
+                .from
+                .add_lamports(escrow_lamports - escrow.sol_amount)?;
         } else {
             ctx.accounts.from.add_lamports(escrow_lamports)?;
         }
@@ -206,11 +237,14 @@ pub mod obridge {
         Ok(())
     }
 
-    pub fn refund(ctx: Context<Refund>, uuid: [u8; 16]) -> Result<()> {
+    pub fn refund(ctx: Context<Refund>, uuid: [u8; 32], _is_out: bool) -> Result<()> {
         let escrow = &mut ctx.accounts.escrow;
         let timestamp = Clock::get()?.unix_timestamp;
 
-        require!(timestamp > escrow.refund_time, Errors::NotRefundable);
+        require!(
+            timestamp >= escrow.lock.earliest_refund_time,
+            Errors::NotRefundable
+        );
 
         let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
 
@@ -228,27 +262,25 @@ pub mod obridge {
         )?;
 
         // close escrow ata account and transfer remaining tokens to "from" account
-        token::close_account(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                CloseAccount {
-                    account: ctx.accounts.escrow_ata.to_account_info(),
-                    destination: ctx.accounts.from.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                seeds,
-            ),
-        )?;
+        token::close_account(CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            CloseAccount {
+                account: ctx.accounts.escrow_ata.to_account_info(),
+                destination: ctx.accounts.from.to_account_info(),
+                authority: escrow.to_account_info(),
+            },
+            seeds,
+        ))?;
 
         // close escrow account
-        
+
         let escrow_lamports = escrow.to_account_info().lamports();
         ctx.accounts.from.add_lamports(escrow_lamports)?;
-        
+
         escrow.sub_lamports(escrow_lamports)?;
         escrow.to_account_info().assign(&system_program::ID);
-        escrow.to_account_info().realloc(0, false)?;        
-        
+        escrow.to_account_info().realloc(0, false)?;
+
         Ok(())
     }
 }
@@ -259,16 +291,14 @@ pub enum Errors {
     AccountMismatch,
     #[msg("escrow closed")]
     EscrowClosed,
-    #[msg("failed to unlock")]
-    FailedToUnlock,
     #[msg("invalid amount")]
     InvalidAmount,
     #[msg("invalid fee rate")]
     InvalidFeeRate,
-    #[msg("invalid timelock")]
-    InvalidTimelock,
-    #[msg("invalid destination")]
-    InvalidDestination,
+    #[msg("invalid sender")]
+    InvalidSender,
+    #[msg("invalid refund time")]
+    InvalidRefundTime,
     #[msg("deadline exceeded")]
     DeadlineExceeded,
     #[msg("preimage mismatch")]
@@ -280,12 +310,25 @@ pub enum Errors {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct Lock {
     pub hash: [u8; 32],
-    pub deadline: i64,
+    pub agreement_reached_time: i64,
+    pub expected_single_step_time: i64,
+    pub tolerant_single_step_time: i64,
+    pub earliest_refund_time: i64,
 }
 
 impl Lock {
-    fn check(&self, hash: &[u8; 32], timestamp: i64) -> Result<()> {
-        require!(timestamp <= self.deadline, Errors::DeadlineExceeded);
+    fn check_refund_time(&self) -> Result<()> {
+        require!(
+            self.earliest_refund_time
+                > self.agreement_reached_time
+                    + 3 * self.expected_single_step_time
+                    + 3 * self.tolerant_single_step_time,
+            Errors::InvalidRefundTime
+        );
+        Ok(())
+    }
+
+    fn check_hashlock(&self, hash: &[u8; 32]) -> Result<()> {
         require!(hash.eq(&self.hash), Errors::PreimageMismatch);
         Ok(())
     }
@@ -357,7 +400,7 @@ pub struct SetMaxFeeForToken<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(uuid: [u8; 16])]
+#[instruction(uuid: [u8; 32])]
 pub struct Prepare<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
@@ -384,8 +427,10 @@ pub struct Prepare<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(uuid: [u8; 16])]
+#[instruction(uuid: [u8; 32])]
 pub struct Confirm<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
     #[account(mut)]
     pub from: SystemAccount<'info>,
     /// CHECK: value recepient
@@ -421,7 +466,7 @@ pub struct Confirm<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(uuid: [u8; 16])]
+#[instruction(uuid: [u8; 32])]
 pub struct Refund<'info> {
     #[account(mut)]
     pub from: SystemAccount<'info>,
@@ -470,8 +515,5 @@ pub struct Escrow {
     pub token_amount: u64,
     pub sol_fee: u64,
     pub token_fee: u64,
-    pub lock1: Lock,
-    pub lock2: Option<Lock>,
-    pub refund_time: i64,
-    pub extra_data: Vec<u8>,
+    pub lock: Lock,
 }

@@ -1,4 +1,4 @@
-import { web3 } from '@coral-xyz/anchor';
+import { web3 } from "@coral-xyz/anchor";
 import {
     createMint,
     getOrCreateAssociatedTokenAccount,
@@ -6,7 +6,9 @@ import {
     TOKEN_PROGRAM_ID,
     AccountLayout,
     getMint,
-} from '@solana/spl-token';
+} from "@solana/spl-token";
+import BN from "bn.js";
+import { keccak_256 } from "@noble/hashes/sha3";
 
 export async function createAccountOnChain(connection: web3.Connection, payer: web3.Keypair): Promise<web3.Keypair> {
     // amount of space to reserve for the account
@@ -101,4 +103,31 @@ export async function transferSOL(
     );
     let confirm = await web3.sendAndConfirmTransaction(connection, tx, [from]);
     return confirm;
+}
+
+export function generateUuid(
+    sender: web3.PublicKey,
+    receiver: web3.PublicKey,
+    hashlock: number[],
+    agreementReachedTime: BN,
+    expectedSingleStepTime: BN,
+    tolerantSingleStepTime: BN,
+    earliestRefundTime: BN,
+    token: web3.PublicKey,
+    tokenAmount: BN,
+    ethAmount: BN,
+): number[] {
+    let data = Buffer.concat([
+        sender.toBuffer(),
+        receiver.toBuffer(),
+        Buffer.from(hashlock),
+        Buffer.from(agreementReachedTime.toArrayLike(Buffer, "le", 64)),
+        Buffer.from(expectedSingleStepTime.toArrayLike(Buffer, "le", 16)),
+        Buffer.from(tolerantSingleStepTime.toArrayLike(Buffer, "le", 16)),
+        Buffer.from(earliestRefundTime.toArrayLike(Buffer, "le", 64)),
+        token.toBuffer(),
+        Buffer.from(tokenAmount.toArrayLike(Buffer, "le", 256)),
+        Buffer.from(ethAmount.toArrayLike(Buffer, "le", 256)),
+    ]);
+    return Array.from(keccak_256(data));
 }

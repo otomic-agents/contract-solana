@@ -447,6 +447,10 @@ export type Obridge = {
             "type": {
               "defined": "Lock"
             }
+          },
+          {
+            "name": "isOut",
+            "type": "bool"
           }
         ]
       }
@@ -532,6 +536,11 @@ export type Obridge = {
       "code": 6008,
       "name": "NotRefundable",
       "msg": "not refundable yet"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidDirection",
+      "msg": "invalid direction"
     }
   ]
 };
@@ -985,6 +994,10 @@ export const IDL: Obridge = {
             "type": {
               "defined": "Lock"
             }
+          },
+          {
+            "name": "isOut",
+            "type": "bool"
           }
         ]
       }
@@ -1070,6 +1083,11 @@ export const IDL: Obridge = {
       "code": 6008,
       "name": "NotRefundable",
       "msg": "not refundable yet"
+    },
+    {
+      "code": 6009,
+      "name": "InvalidDirection",
+      "msg": "invalid direction"
     }
   ]
 };

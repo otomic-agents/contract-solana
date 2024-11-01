@@ -1,13 +1,10 @@
 use anchor_lang::prelude::*;
-use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount};
 use solana_program::keccak;
 use std::mem::size_of;
 
-declare_id!("FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo");
+declare_id!("7AqTXFCDLKm3rxfyHWfbZ3Lox91D2qK6GHYMrhPHYfDW");
 
 const ADMIN_SETTINGS_SEED: &[u8] = b"settings";
-const TOKEN_SETTINGS_SEED_PREFIX: &[u8] = b"token";
 
 #[program]
 pub mod obridge {
@@ -35,21 +32,11 @@ pub mod obridge {
         Ok(())
     }
 
-    pub fn set_max_fee_for_token(
-        ctx: Context<SetMaxFeeForToken>,
-        _mint: Pubkey,
-        max_fee: u64,
-    ) -> Result<()> {
-        ctx.accounts.token_settings.max_fee = max_fee;
-        Ok(())
-    }
-
     pub fn prepare(
         ctx: Context<Prepare>,
         _uuid: [u8; 32],
         to: Pubkey,
         sol_amount: u64,
-        token_amount: u64,
         lock: Lock,
         is_out: bool,
         _memo: Vec<u8>,
@@ -59,7 +46,7 @@ pub mod obridge {
             Errors::InvalidSender
         );
 
-        require!(token_amount > 0, Errors::InvalidAmount);
+        require!(sol_amount > 0, Errors::InvalidAmount);
 
         let timestamp = Clock::get()?.unix_timestamp;
 
@@ -72,54 +59,25 @@ pub mod obridge {
 
         lock.check_refund_time()?;
 
-        let fee_rate_bp = ctx.accounts.admin_settings.fee_rate_bp as u64;
-        let mut sol_fee: u64 = 0;
-        if sol_amount > 0 {
-            system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    system_program::Transfer {
-                        from: ctx.accounts.from.to_account_info(),
-                        to: ctx.accounts.escrow.to_account_info(),
-                    },
-                ),
-                sol_amount,
-            )?;
-
-            sol_fee = sol_amount * fee_rate_bp / 10000;
-        }
-
-        token::transfer(
+        system_program::transfer(
             CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: ctx.accounts.source.to_account_info(),
-                    to: ctx.accounts.escrow_ata.to_account_info(),
-                    authority: ctx.accounts.from.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+                system_program::Transfer {
+                    from: ctx.accounts.from.to_account_info(),
+                    to: ctx.accounts.escrow.to_account_info(),
                 },
             ),
-            token_amount,
+            sol_amount,
         )?;
 
-        let mut token_fee = token_amount * fee_rate_bp / 10000;
-        if ctx.accounts.token_settings.is_some() {
-            let max_fee = ctx.accounts.token_settings.as_ref().unwrap().max_fee;
-            if max_fee > 0 && token_fee > max_fee {
-                token_fee = max_fee;
-            }
-        }
+        let fee_rate_bp = ctx.accounts.admin_settings.fee_rate_bp as u64;
+        let sol_fee = sol_amount * fee_rate_bp / 10000;
 
         let escrow = &mut ctx.accounts.escrow;
         escrow.from = ctx.accounts.from.key();
         escrow.to = to;
-        escrow.token_program = ctx.accounts.token_program.key();
-        escrow.mint = ctx.accounts.mint.key();
-        escrow.source = ctx.accounts.source.key();
-        escrow.escrow_ata = ctx.accounts.escrow_ata.key();
         escrow.sol_amount = sol_amount;
-        escrow.token_amount = token_amount;
         escrow.sol_fee = sol_fee;
-        escrow.token_fee = token_fee;
         escrow.lock = lock;
         escrow.is_out = is_out;
         Ok(())
@@ -127,7 +85,7 @@ pub mod obridge {
 
     pub fn confirm(
         ctx: Context<Confirm>,
-        uuid: [u8; 32],
+        _uuid: [u8; 32],
         preimage: [u8; 32],
         is_out: bool,
     ) -> Result<()> {
@@ -178,58 +136,16 @@ pub mod obridge {
             }
         }
 
-        let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: ctx.accounts.escrow_ata.to_account_info(),
-                    to: ctx.accounts.fee_destination.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                seeds,
-            ),
-            escrow.token_fee,
-        )?;
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: ctx.accounts.escrow_ata.to_account_info(),
-                    to: ctx.accounts.destination.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                seeds,
-            ),
-            escrow.token_amount - escrow.token_fee,
-        )?;
-
-        // close escrow ata account and transfer remaining tokens to "from" account
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_ata.to_account_info(),
-                destination: ctx.accounts.from.to_account_info(),
-                authority: escrow.to_account_info(),
-            },
-            seeds,
-        ))?;
-
         // close escrow account
         let escrow_lamports = escrow.to_account_info().lamports();
-        if escrow.sol_amount > 0 {
-            ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
-            ctx.accounts
-                .to
-                .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
-            ctx.accounts
-                .from
-                .add_lamports(escrow_lamports - escrow.sol_amount)?;
-        } else {
-            ctx.accounts.from.add_lamports(escrow_lamports)?;
-        }
+
+        ctx.accounts.fee_recepient.add_lamports(escrow.sol_fee)?;
+        ctx.accounts
+            .to
+            .add_lamports(escrow.sol_amount - escrow.sol_fee)?;
+        ctx.accounts
+            .from
+            .add_lamports(escrow_lamports - escrow.sol_amount)?;
 
         escrow.sub_lamports(escrow_lamports)?;
         escrow.to_account_info().assign(&system_program::ID);
@@ -238,7 +154,7 @@ pub mod obridge {
         Ok(())
     }
 
-    pub fn refund(ctx: Context<Refund>, uuid: [u8; 32], _is_out: bool) -> Result<()> {
+    pub fn refund(ctx: Context<Refund>, _uuid: [u8; 32], _is_out: bool) -> Result<()> {
         let escrow = &mut ctx.accounts.escrow;
         let timestamp = Clock::get()?.unix_timestamp;
 
@@ -247,34 +163,7 @@ pub mod obridge {
             Errors::NotRefundable
         );
 
-        let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
-
-        token::transfer(
-            CpiContext::new_with_signer(
-                ctx.accounts.token_program.to_account_info(),
-                token::Transfer {
-                    from: ctx.accounts.escrow_ata.to_account_info(),
-                    to: ctx.accounts.source.to_account_info(),
-                    authority: escrow.to_account_info(),
-                },
-                seeds,
-            ),
-            escrow.token_amount,
-        )?;
-
-        // close escrow ata account and transfer remaining tokens to "from" account
-        token::close_account(CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            CloseAccount {
-                account: ctx.accounts.escrow_ata.to_account_info(),
-                destination: ctx.accounts.from.to_account_info(),
-                authority: escrow.to_account_info(),
-            },
-            seeds,
-        ))?;
-
         // close escrow account
-
         let escrow_lamports = escrow.to_account_info().lamports();
         ctx.accounts.from.add_lamports(escrow_lamports)?;
 
@@ -382,51 +271,17 @@ pub struct SetFeeRate<'info> {
 }
 
 #[derive(Accounts)]
-#[instruction(mint: Pubkey)]
-pub struct SetMaxFeeForToken<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    pub admin: Signer<'info>,
-
-    #[account(seeds = [ADMIN_SETTINGS_SEED], bump, has_one = admin @ Errors::AccountMismatch)]
-    pub admin_settings: Account<'info, AdminSettings>,
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = size_of::<TokenSettings>() + 8,
-        seeds = [TOKEN_SETTINGS_SEED_PREFIX, &mint.to_bytes()],
-        bump,
-    )]
-    pub token_settings: Account<'info, TokenSettings>,
-
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
 #[instruction(uuid: [u8; 32])]
 pub struct Prepare<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
     pub from: Signer<'info>,
-
-    pub mint: Account<'info, Mint>,
-    #[account(mut)]
-    pub source: Account<'info, TokenAccount>,
-
     #[account(init, payer = payer, space = size_of::<Escrow>() + 8, seeds = [&uuid], bump)]
     pub escrow: Account<'info, Escrow>,
-    #[account(init, payer = payer, associated_token::mint = mint, associated_token::authority = escrow)]
-    pub escrow_ata: Account<'info, TokenAccount>,
-
     #[account(seeds = [ADMIN_SETTINGS_SEED], bump)]
     pub admin_settings: Account<'info, AdminSettings>,
-    #[account(seeds = [TOKEN_SETTINGS_SEED_PREFIX, &mint.key().to_bytes()], bump)]
-    pub token_settings: Option<Account<'info, TokenSettings>>,
-
-    pub associated_token_program: Program<'info, AssociatedToken>,
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -439,34 +294,22 @@ pub struct Confirm<'info> {
     /// CHECK: value recepient
     #[account(mut)]
     pub to: UncheckedAccount<'info>,
-    #[account(mut, associated_token::mint = escrow.mint, associated_token::authority = escrow.to)]
-    pub destination: Account<'info, TokenAccount>,
-
     #[account(
         mut,
         seeds=[&uuid],
         bump,
         has_one = from @ Errors::AccountMismatch,
         has_one = to @ Errors::AccountMismatch,
-        has_one = escrow_ata @ Errors::AccountMismatch,
-        has_one = token_program @ Errors::AccountMismatch,
-        constraint = escrow.token_amount > 0 @ Errors::EscrowClosed,
         constraint = escrow.is_out == is_out @ Errors::InvalidDirection,
+        constraint = escrow.sol_amount > 0 @ Errors::EscrowClosed,
     )]
     pub escrow: Account<'info, Escrow>,
-    #[account(mut)]
-    pub escrow_ata: Account<'info, TokenAccount>,
-
     #[account(seeds = [ADMIN_SETTINGS_SEED], bump, has_one = fee_recepient)]
     pub admin_settings: Account<'info, AdminSettings>,
     /// CHECK: fee recepient
     #[account(mut)]
     pub fee_recepient: UncheckedAccount<'info>,
-    #[account(mut, associated_token::mint = escrow.mint, associated_token::authority = admin_settings.fee_recepient)]
-    pub fee_destination: Account<'info, TokenAccount>,
-
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
 }
 
 #[derive(Accounts)]
@@ -474,26 +317,16 @@ pub struct Confirm<'info> {
 pub struct Refund<'info> {
     #[account(mut)]
     pub from: SystemAccount<'info>,
-    #[account(mut)]
-    pub source: Account<'info, TokenAccount>,
-
     #[account(
         mut,
         seeds=[&uuid],
         bump,
         has_one = from @ Errors::AccountMismatch,
-        has_one = source @ Errors::AccountMismatch,
-        has_one = escrow_ata @ Errors::AccountMismatch,
-        has_one = token_program @ Errors::AccountMismatch,
-        constraint = escrow.token_amount > 0 @ Errors::EscrowClosed,
         constraint = escrow.is_out == is_out @ Errors::InvalidDirection,
+        constraint = escrow.sol_amount > 0 @ Errors::EscrowClosed,
     )]
     pub escrow: Account<'info, Escrow>,
-    #[account(mut)]
-    pub escrow_ata: Account<'info, TokenAccount>,
-
     pub system_program: Program<'info, System>,
-    pub token_program: Program<'info, Token>,
 }
 
 #[account]
@@ -504,22 +337,11 @@ pub struct AdminSettings {
 }
 
 #[account]
-pub struct TokenSettings {
-    pub max_fee: u64,
-}
-
-#[account]
 pub struct Escrow {
     pub from: Pubkey,
     pub to: Pubkey,
-    pub token_program: Pubkey,
-    pub mint: Pubkey,
-    pub source: Pubkey,
-    pub escrow_ata: Pubkey,
     pub sol_amount: u64,
-    pub token_amount: u64,
     pub sol_fee: u64,
-    pub token_fee: u64,
     pub lock: Lock,
     pub is_out: bool,
 }

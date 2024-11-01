@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "name": "obridge",
+  "name": "obridge_sol",
   "instructions": [
     {
       "name": "initialize",
@@ -92,46 +92,6 @@
       ]
     },
     {
-      "name": "setMaxFeeForToken",
-      "accounts": [
-        {
-          "name": "payer",
-          "isMut": true,
-          "isSigner": true
-        },
-        {
-          "name": "admin",
-          "isMut": false,
-          "isSigner": true
-        },
-        {
-          "name": "adminSettings",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenSettings",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        }
-      ],
-      "args": [
-        {
-          "name": "mint",
-          "type": "publicKey"
-        },
-        {
-          "name": "maxFee",
-          "type": "u64"
-        }
-      ]
-    },
-    {
       "name": "prepare",
       "accounts": [
         {
@@ -145,22 +105,7 @@
           "isSigner": true
         },
         {
-          "name": "mint",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "source",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "escrow",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "escrowAta",
           "isMut": true,
           "isSigner": false
         },
@@ -170,23 +115,7 @@
           "isSigner": false
         },
         {
-          "name": "tokenSettings",
-          "isMut": false,
-          "isSigner": false,
-          "isOptional": true
-        },
-        {
-          "name": "associatedTokenProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -207,10 +136,6 @@
         },
         {
           "name": "solAmount",
-          "type": "u64"
-        },
-        {
-          "name": "tokenAmount",
           "type": "u64"
         },
         {
@@ -248,17 +173,7 @@
           "isSigner": false
         },
         {
-          "name": "destination",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "escrow",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
-          "name": "escrowAta",
           "isMut": true,
           "isSigner": false
         },
@@ -273,17 +188,7 @@
           "isSigner": false
         },
         {
-          "name": "feeDestination",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -322,27 +227,12 @@
           "isSigner": false
         },
         {
-          "name": "source",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "escrow",
           "isMut": true,
           "isSigner": false
         },
         {
-          "name": "escrowAta",
-          "isMut": true,
-          "isSigner": false
-        },
-        {
           "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
-        },
-        {
-          "name": "tokenProgram",
           "isMut": false,
           "isSigner": false
         }
@@ -386,18 +276,6 @@
       }
     },
     {
-      "name": "TokenSettings",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "maxFee",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "Escrow",
       "type": {
         "kind": "struct",
@@ -411,35 +289,11 @@
             "type": "publicKey"
           },
           {
-            "name": "tokenProgram",
-            "type": "publicKey"
-          },
-          {
-            "name": "mint",
-            "type": "publicKey"
-          },
-          {
-            "name": "source",
-            "type": "publicKey"
-          },
-          {
-            "name": "escrowAta",
-            "type": "publicKey"
-          },
-          {
             "name": "solAmount",
             "type": "u64"
           },
           {
-            "name": "tokenAmount",
-            "type": "u64"
-          },
-          {
             "name": "solFee",
-            "type": "u64"
-          },
-          {
-            "name": "tokenFee",
             "type": "u64"
           },
           {
@@ -544,6 +398,6 @@
     }
   ],
   "metadata": {
-    "address": "FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo"
+    "address": "7AqTXFCDLKm3rxfyHWfbZ3Lox91D2qK6GHYMrhPHYfDW"
   }
 }

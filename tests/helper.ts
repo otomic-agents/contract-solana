@@ -131,3 +131,26 @@ export function generateUuid(
     ]);
     return Array.from(keccak_256(data));
 }
+
+export function generateUuidSol(
+    sender: web3.PublicKey,
+    receiver: web3.PublicKey,
+    hashlock: number[],
+    agreementReachedTime: BN,
+    expectedSingleStepTime: BN,
+    tolerantSingleStepTime: BN,
+    earliestRefundTime: BN,
+    solAmount: BN,
+): number[] {
+    let data = Buffer.concat([
+        sender.toBuffer(),
+        receiver.toBuffer(),
+        Buffer.from(hashlock),
+        Buffer.from(agreementReachedTime.toArrayLike(Buffer, "le", 64)),
+        Buffer.from(expectedSingleStepTime.toArrayLike(Buffer, "le", 16)),
+        Buffer.from(tolerantSingleStepTime.toArrayLike(Buffer, "le", 16)),
+        Buffer.from(earliestRefundTime.toArrayLike(Buffer, "le", 64)),
+        Buffer.from(solAmount.toArrayLike(Buffer, "le", 256)),
+    ]);
+    return Array.from(keccak_256(data));
+}

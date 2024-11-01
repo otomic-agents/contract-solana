@@ -8,8 +8,10 @@ test-ledger
 .env
 
 target/deploy/obridge-keypair.json
+target/deploy/obridge_sol-keypair.json 
 target/release
 target/sbf-solana-solana
 target/.rustc_info.json
+target/debug
 
 temp-scripts

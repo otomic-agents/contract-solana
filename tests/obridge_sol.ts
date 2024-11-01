@@ -1,26 +1,10 @@
 import crypto from "crypto";
 import * as anchor from "@coral-xyz/anchor";
 import { Program, web3, AnchorError } from "@coral-xyz/anchor";
-import { Obridge } from "../target/types/obridge";
-import {
-    getAccount,
-    TOKEN_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID,
-    getAssociatedTokenAddressSync,
-    getOrCreateAssociatedTokenAccount,
-    Account,
-} from "@solana/spl-token";
+import { ObridgeSol } from "../target/types/obridge_sol";
 import { keccak_256 } from "@noble/hashes/sha3";
 import BN from "bn.js";
-import {
-    createAccountOnChain,
-    airdropSOL,
-    createSPLTokenAndMintToUser,
-    transferSOL,
-    sleep,
-    splTokensBalance,
-    generateUuid,
-} from "./helper";
+import { createAccountOnChain, airdropSOL, transferSOL, generateUuidSol, sleep } from "./helper";
 import { expect } from "chai";
 
 type Lock = {
@@ -31,14 +15,14 @@ type Lock = {
     earliestRefundTime: BN;
 };
 
-describe("SPL A token <-> SPL B token + SOL", () => {
+describe("SOL <-> SOL", () => {
     // Configure the client to use the local cluster.
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
 
     const connection = provider.connection;
     console.log(`network connected: ${connection.rpcEndpoint}`);
-    const program = anchor.workspace.Obridge as Program<Obridge>;
+    const program = anchor.workspace.ObridgeSol as Program<ObridgeSol>;
     console.log(`obridge program: ${program.programId}`);
 
     // create user and airdrop SOL
@@ -55,18 +39,10 @@ describe("SPL A token <-> SPL B token + SOL", () => {
     console.log(`feeRecepient: ${feeRecepient.publicKey}`);
 
     let user: web3.Keypair;
-    let tokenAmount: BN;
     let solAmount: BN;
-    let mint1: web3.PublicKey;
-    let mint1Settings: web3.PublicKey;
-    let userAtaTokenMint1Account: Account;
 
     let lp: web3.Keypair;
-    let tokenAmountBack: BN;
     let solAmountBack: BN;
-    let mint2: web3.PublicKey;
-    let mint2Settings: web3.PublicKey;
-    let lpAtaTokenMint2Account: Account;
 
     let adminSettings: web3.PublicKey;
     let preimage: Array<number>;
@@ -83,51 +59,17 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         const payerBal = await connection.getBalance(payer.publicKey);
         console.log(`payer ${payer.publicKey} balance: ${payerBal / web3.LAMPORTS_PER_SOL} SOL`);
 
-        tokenAmount = new BN(2 * 10 ** 9);
-        solAmount = new BN(0);
+        solAmount = new BN(2 * 10 ** 9);
         user = await createAccountOnChain(connection, payer);
         await transferSOL(connection, payer, user.publicKey, 20 * 10 ** 9);
         const userBal = await connection.getBalance(user.publicKey);
         console.log(`user: ${user.publicKey} balance: ${userBal / web3.LAMPORTS_PER_SOL} SOL`);
 
-        let ret = await createSPLTokenAndMintToUser(connection, payer, user, tokenAmount.toNumber());
-        mint1 = ret.mint;
-        userAtaTokenMint1Account = ret.ataTokenAccount;
-        [mint1Settings] = web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("token"), mint1.toBytes()],
-            program.programId,
-        );
-        console.log(`offchain mint1Settings: ${mint1Settings.toBase58()}`);
-        console.log(
-            `create SPL token mint1 ${mint1} and user ${user.publicKey} ata account ${userAtaTokenMint1Account.address}`,
-        );
-        userAtaTokenMint1Account = await getAccount(connection, userAtaTokenMint1Account.address);
-        console.log(
-            `user ata token mint1 account ${userAtaTokenMint1Account.address} balance: ${userAtaTokenMint1Account.amount}`,
-        );
-
-        tokenAmountBack = new BN(5 * 10 ** 9);
-        solAmountBack = new BN(5 * 10 ** 9);
+        solAmountBack = new BN(2 * 10 ** 9);
         lp = await createAccountOnChain(connection, payer);
         await transferSOL(connection, payer, lp.publicKey, 20 * 10 ** 9);
         const lpBal = await connection.getBalance(lp.publicKey);
         console.log(`lp: ${lp.publicKey} balance: ${lpBal / web3.LAMPORTS_PER_SOL} SOL`);
-
-        ret = await createSPLTokenAndMintToUser(connection, payer, lp, tokenAmountBack.toNumber());
-        mint2 = ret.mint;
-        lpAtaTokenMint2Account = ret.ataTokenAccount;
-        [mint2Settings] = web3.PublicKey.findProgramAddressSync(
-            [Buffer.from("token"), mint2.toBytes()],
-            program.programId,
-        );
-        console.log(`offchain mint2Settings: ${mint2Settings.toBase58()}`);
-        console.log(
-            `create SPL token mint2 ${mint2} and lp ${lp.publicKey} ata account ${lpAtaTokenMint2Account.address}`,
-        );
-        lpAtaTokenMint2Account = await getAccount(connection, lpAtaTokenMint2Account.address);
-        console.log(
-            `lp ata token mint2 account ${lpAtaTokenMint2Account.address} balance: ${lpAtaTokenMint2Account.amount}`,
-        );
 
         [adminSettings] = web3.PublicKey.findProgramAddressSync([Buffer.from("settings")], program.programId);
         console.log(`offchain adminSettings: ${adminSettings.toBase58()}`);
@@ -140,17 +82,9 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         isIn = false;
     });
 
-    it("swap SPL A Token <-> SPL B Token + SOL", async () => {
-        let userMint1BalBefore = new BN(userAtaTokenMint1Account.amount.toString());
-        let userMint2BalBefore = new BN(0);
+    it("swap SOL <-> SOL", async () => {
         let userSOLBalBefore = new BN(await connection.getBalance(user.publicKey));
-
-        let lpMint1BalBefore = new BN(0);
-        let lpMint2BalBefore = new BN(lpAtaTokenMint2Account.amount.toString());
         let lpSOLBalBefore = new BN(await connection.getBalance(lp.publicKey));
-
-        let feeRecepientMint1BalBefore = new BN(0);
-        let feeRecepientMint2BalBefore = new BN(0);
         let feeRecepientSOLBalBefore = new BN(await connection.getBalance(feeRecepient.publicKey));
 
         let slot = await connection.getSlot();
@@ -174,7 +108,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`lock: ${JSON.stringify(lock)}`);
 
         console.log(`========== transfer out ==========`);
-        let uuid1 = generateUuid(
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -182,8 +116,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
             solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
@@ -192,28 +124,18 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
-
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         // got error before initialize program
         try {
             await program.methods
-                .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+                .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
-                    mint: mint1,
-                    source: userAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     adminSettings: adminSettings,
-                    tokenSettings: null,
-                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .signers([user])
                 .rpc();
@@ -293,25 +215,17 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         console.log(`set fee rate tx: ${tx}`);
 
-        let feeMint1 = tokenAmount.mul(new BN(1000)).div(new BN(10000));
-        let feeMint2 = tokenAmountBack.mul(new BN(1000)).div(new BN(10000));
         let feeSOL = solAmountBack.mul(new BN(1000)).div(new BN(10000));
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+            .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
-                mint: mint1,
-                source: userAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user])
             .rpc();
@@ -321,19 +235,13 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         // try to use same uuid for wrong test
         try {
             await program.methods
-                .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+                .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
-                    mint: mint1,
-                    source: userAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     adminSettings: adminSettings,
-                    tokenSettings: null,
-                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .signers([user])
                 .rpc();
@@ -345,7 +253,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         }
 
         console.log(`========== transfer in ==========`);
-        let uuid2 = generateUuid(
+        let uuid2 = generateUuidSol(
             lp.publicKey,
             user.publicKey,
             lock.hash,
@@ -353,8 +261,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint2,
-            tokenAmountBack,
             solAmountBack,
         );
         console.log(`generate uuid2: ${uuid2}`);
@@ -363,25 +269,15 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
         console.log(`offchain escrow2: ${escrow2}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow2AtaTokenAccount = getAssociatedTokenAddressSync(mint2, escrow2, true);
-        console.log(`offchain escrow2 ata ${escrow2AtaTokenAccount}`);
-
         // lp response to the swap initiated by user (transfer in)
         const tx2 = await program.methods
-            .prepare(uuid2, user.publicKey, solAmountBack, tokenAmountBack, lock, isIn, memo)
+            .prepare(uuid2, user.publicKey, solAmountBack, lock, isIn, memo)
             .accounts({
                 payer: lp.publicKey,
                 from: lp.publicKey,
-                mint: mint2,
-                source: lpAtaTokenMint2Account.address,
                 escrow: escrow2,
-                escrowAta: escrow2AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([lp])
             .rpc();
@@ -402,17 +298,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         console.log(`update fee rate in the middle of swap: ${tx}`);
 
-        // lp token mint1 ata address
-        let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
-
-        // fee recepient mint1 ata address
-        let feeMin1Destination = await getOrCreateAssociatedTokenAccount(
-            connection,
-            payer,
-            mint1,
-            feeRecepient.publicKey,
-        );
-
         // user confirm the swap (transfer out)
         const tx3 = await program.methods
             .confirm(uuid1, preimage, isOut)
@@ -420,14 +305,10 @@ describe("SPL A token <-> SPL B token + SOL", () => {
                 payer: user.publicKey,
                 from: user.publicKey,
                 to: lp.publicKey,
-                destination: lpAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
                 feeRecepient: feeRecepient.publicKey,
-                feeDestination: feeMin1Destination.address,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user])
             .rpc();
@@ -435,22 +316,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`confirm transfer out tx: ${tx3}`);
 
         console.log(`========== confirm transfer in ==========`);
-        // user token mint2 ata address
-        let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(
-            connection,
-            payer,
-            mint2,
-            user.publicKey,
-        );
-
-        // fee recepient mint2 ata address
-        let feeMin2Destination = await getOrCreateAssociatedTokenAccount(
-            connection,
-            payer,
-            mint2,
-            feeRecepient.publicKey,
-        );
-
         // lp confirm the swap (transfer in)
         const tx4 = await program.methods
             .confirm(uuid2, preimage, isIn)
@@ -458,51 +323,29 @@ describe("SPL A token <-> SPL B token + SOL", () => {
                 payer: lp.publicKey,
                 from: lp.publicKey,
                 to: user.publicKey,
-                destination: userAtaTokenMint2Account.address,
                 escrow: escrow2,
-                escrowAta: escrow2AtaTokenAccount,
                 adminSettings: adminSettings,
                 feeRecepient: feeRecepient.publicKey,
-                feeDestination: feeMin2Destination.address,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([lp])
             .rpc();
 
         console.log(`confirm transfer in tx: ${tx4}`);
 
-        let userMint1BalAfter = new BN(
-            (await getAccount(connection, userAtaTokenMint1Account.address)).amount.toString(),
-        );
-        let userMint2BalAfter = new BN(
-            (await getAccount(connection, userAtaTokenMint2Account.address)).amount.toString(),
-        );
         let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
-        expect(userMint1BalBefore.sub(userMint1BalAfter).toString()).to.be.eq(tokenAmount.toString());
-        expect(userMint2BalAfter.sub(userMint2BalBefore).toString()).to.be.eq(tokenAmountBack.sub(feeMint2).toString());
-        expect(userSOLBalAfter.sub(userSOLBalBefore).toNumber()).to.be.eq(solAmountBack.sub(feeSOL).toNumber());
+        expect(userSOLBalBefore.sub(userSOLBalAfter).toNumber()).to.be.eq(feeSOL.toNumber());
 
-        let lpMint1BalAfter = new BN((await getAccount(connection, lpAtaTokenMint1Account.address)).amount.toString());
-        let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());
         let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
-        expect(lpMint1BalAfter.sub(lpMint1BalBefore).toString()).to.be.eq(tokenAmount.sub(feeMint1).toString());
-        expect(lpMint2BalBefore.sub(lpMint2BalAfter).toString()).to.be.eq(tokenAmountBack.toString());
-        expect(lpSOLBalBefore.sub(lpSOLBalAfter).toNumber()).to.be.eq(solAmountBack.toNumber());
+        expect(lpSOLBalBefore.sub(lpSOLBalAfter).toNumber()).to.be.eq(feeSOL.toNumber());
 
-        let feeRecepientMint1BalAfter = new BN(
-            (await getAccount(connection, feeMin1Destination.address)).amount.toString(),
-        );
-        let feeRecepientMint2BalAfter = new BN(
-            (await getAccount(connection, feeMin2Destination.address)).amount.toString(),
-        );
         let feeRecepientSOLBalAfter = new BN(await connection.getBalance(feeRecepient.publicKey));
-        expect(feeRecepientMint1BalAfter.sub(feeRecepientMint1BalBefore).toString()).to.be.eq(feeMint1.toString());
-        expect(feeRecepientMint2BalAfter.sub(feeRecepientMint2BalBefore).toString()).to.be.eq(feeMint2.toString());
-        expect(feeRecepientSOLBalAfter.sub(feeRecepientSOLBalBefore).toString()).to.be.eq(feeSOL.toString());
+        expect(feeRecepientSOLBalAfter.sub(feeRecepientSOLBalBefore).toString()).to.be.eq(
+            feeSOL.mul(new BN(2)).toString(),
+        );
     });
 
-    it("cannot call initiate after deadline", async () => {
+    it("cannot call initiate after deadline for SOL swap", async () => {
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
@@ -524,7 +367,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         console.log(`lock: ${JSON.stringify(lock)}`);
 
-        let uuid1 = generateUuid(
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -532,8 +375,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
             solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
@@ -542,10 +383,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
-
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         // sleep until the transfer out deadline
@@ -553,19 +390,13 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         try {
             await program.methods
-                .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+                .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
-                    mint: mint1,
-                    source: userAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     adminSettings: adminSettings,
-                    tokenSettings: null,
-                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .signers([user])
                 .rpc();
@@ -577,7 +408,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         }
     });
 
-    it("cannot call initiate with amount 0", async () => {
+    it("cannot call initiate with amount 0 for SOL swap", async () => {
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
@@ -598,7 +429,9 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         };
         console.log(`lock: ${JSON.stringify(lock)}`);
 
-        let uuid1 = generateUuid(
+        solAmount = new BN(0);
+
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -606,8 +439,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
             solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
@@ -616,27 +447,17 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
-
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         try {
             await program.methods
-                .prepare(uuid1, lp.publicKey, solAmount, new BN(0), lock, isOut, memo)
+                .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
-                    mint: mint1,
-                    source: userAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     adminSettings: adminSettings,
-                    tokenSettings: null,
-                    associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .signers([user, user])
                 .rpc();
@@ -648,7 +469,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         }
     });
 
-    it("refund SPL A Token <-> SPL B Token + SOL", async () => {
+    it("refund SOL <-> SOL", async () => {
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
@@ -668,7 +489,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         };
         console.log(`lock: ${JSON.stringify(lock)}`);
 
-        let uuid1 = generateUuid(
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -676,8 +497,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
             solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
@@ -686,36 +505,21 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
-
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
-        let userMint1BalBefore = new BN(userAtaTokenMint1Account.amount.toString());
-        let userMint2BalBefore = new BN(0);
         let userSOLBalBefore = new BN(await connection.getBalance(user.publicKey));
-
-        let lpMint1BalBefore = new BN(0);
-        let lpMint2BalBefore = new BN(lpAtaTokenMint2Account.amount.toString());
         let lpSOLBalBefore = new BN(await connection.getBalance(lp.publicKey));
 
         // user initate a swap by sending transfer out
         console.log(`========== transfer out ==========`);
         tx = await program.methods
-            .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+            .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
-                mint: mint1,
-                source: userAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user, user])
             .rpc();
@@ -723,7 +527,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`transfer out tx: ${tx}`);
 
         console.log(`========== transfer in ==========`);
-        let uuid2 = generateUuid(
+        let uuid2 = generateUuidSol(
             lp.publicKey,
             user.publicKey,
             lock.hash,
@@ -731,8 +535,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint2,
-            tokenAmountBack,
             solAmountBack,
         );
         console.log(`generate uuid2: ${uuid2}`);
@@ -741,25 +543,15 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
         console.log(`offchain escrow2: ${escrow2}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow2AtaTokenAccount = getAssociatedTokenAddressSync(mint2, escrow2, true);
-        console.log(`offchain escrow2 ata ${escrow2AtaTokenAccount}`);
-
         // lp response to the swap initiated by user (transfer in)
         const tx2 = await program.methods
-            .prepare(uuid2, user.publicKey, solAmountBack, tokenAmountBack, lock, isIn, memo)
+            .prepare(uuid2, user.publicKey, solAmountBack, lock, isIn, memo)
             .accounts({
                 payer: lp.publicKey,
                 from: lp.publicKey,
-                mint: mint2,
-                source: lpAtaTokenMint2Account.address,
                 escrow: escrow2,
-                escrowAta: escrow2AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([lp])
             .rpc();
@@ -773,11 +565,8 @@ describe("SPL A token <-> SPL B token + SOL", () => {
                 .refund(uuid1, isOut)
                 .accounts({
                     from: user.publicKey,
-                    source: userAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .rpc();
         } catch (err: any) {
@@ -805,11 +594,8 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             .refund(uuid1, isOut)
             .accounts({
                 from: user.publicKey,
-                source: userAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .rpc();
 
@@ -821,35 +607,26 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             .refund(uuid2, isIn)
             .accounts({
                 from: lp.publicKey,
-                source: lpAtaTokenMint2Account.address,
                 escrow: escrow2,
-                escrowAta: escrow2AtaTokenAccount,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .rpc();
 
         console.log(`lp refund transfer in tx: ${tx6}`);
 
-        let userMint1BalAfter = new BN(
-            (await getAccount(connection, userAtaTokenMint1Account.address)).amount.toString(),
-        );
         let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
-        expect(userMint1BalBefore.toString()).to.be.eq(userMint1BalAfter.toString());
-        expect(userSOLBalAfter.toNumber()).to.be.eq(userSOLBalBefore.toNumber());
+        expect(userSOLBalBefore.toNumber()).to.be.eq(userSOLBalAfter.toNumber());
 
-        let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());
         let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
-        expect(lpMint2BalAfter.toString()).to.be.eq(lpMint2BalBefore.toString());
         expect(lpSOLBalBefore.toNumber()).to.be.eq(lpSOLBalAfter.toNumber());
     });
 
-    it("nonexisting account test", async () => {
+    it("nonexisting account test for SOL swap", async () => {
         // create lp offchain and see what happens
+        console.log(`========== before swap ==========`);
         lp = web3.Keypair.generate();
         const lpBal = await connection.getBalance(lp.publicKey);
         console.log(`lp: ${lp.publicKey} balance: ${lpBal / web3.LAMPORTS_PER_SOL} SOL`);
-        tokenAmountBack = new BN(5 * 10 ** 9);
 
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
@@ -871,12 +648,8 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         };
         console.log(`lock: ${JSON.stringify(lock)}`);
 
-        console.log(`========== before swap ==========`);
-        await splTokensBalance(connection, user.publicKey);
-        await splTokensBalance(connection, lp.publicKey);
-
         console.log(`========== transfer out ==========`);
-        let uuid1 = generateUuid(
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -884,19 +657,13 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
-            new BN(0),
+            solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
 
         // calculate escrow account address offchain without create it
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
-
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
 
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
@@ -914,19 +681,13 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         // user initiate the swap (transfer out)
         tx = await program.methods
-            .prepare(uuid1, lp.publicKey, new BN(0), tokenAmount, lock, isOut, memo)
+            .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
-                mint: mint1,
-                source: userAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user])
             .rpc();
@@ -934,16 +695,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`transfer out tx: ${tx}`);
 
         console.log(`========== confirm transfer out ==========`);
-        // lp token mint1 ata address
-        let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
-
-        // fee recepient mint1 ata address
-        let feeMin1Destination = await getOrCreateAssociatedTokenAccount(
-            connection,
-            payer,
-            mint1,
-            feeRecepient.publicKey,
-        );
 
         // user confirm the swap (transfer out)
         const tx3 = await program.methods
@@ -952,14 +703,10 @@ describe("SPL A token <-> SPL B token + SOL", () => {
                 payer: user.publicKey,
                 from: user.publicKey,
                 to: lp.publicKey,
-                destination: lpAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
                 feeRecepient: feeRecepient.publicKey,
-                feeDestination: feeMin1Destination.address,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user])
             .rpc();
@@ -967,8 +714,9 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`confirm transfer out tx: ${tx3}`);
 
         console.log(`========== after swap ==========`);
-        await splTokensBalance(connection, user.publicKey);
-        await splTokensBalance(connection, lp.publicKey);
+        const lpAfter = await connection.getBalance(lp.publicKey);
+        console.log(`lp: ${lp.publicKey} balance: ${lpAfter / web3.LAMPORTS_PER_SOL} SOL`);
+        expect(lpAfter - lpBal).to.be.eq(solAmount.toNumber());
     });
 
     it("cannot confirm out by using confirm in function", async () => {
@@ -993,7 +741,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`lock: ${JSON.stringify(lock)}`);
 
         console.log(`========== transfer out ==========`);
-        let uuid1 = generateUuid(
+        let uuid1 = generateUuidSol(
             user.publicKey,
             lp.publicKey,
             lock.hash,
@@ -1001,8 +749,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint1,
-            tokenAmount,
             solAmount,
         );
         console.log(`generate uuid1: ${uuid1}`);
@@ -1011,27 +757,17 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
         console.log(`offchain escrow1: ${escrow1}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow1AtaTokenAccount = getAssociatedTokenAddressSync(mint1, escrow1, true);
-        console.log(`offchain escrow1 ata ${escrow1AtaTokenAccount}`);
-
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, lp.publicKey, solAmount, tokenAmount, lock, isOut, memo)
+            .prepare(uuid1, lp.publicKey, solAmount, lock, isOut, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
-                mint: mint1,
-                source: userAtaTokenMint1Account.address,
                 escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([user])
             .rpc();
@@ -1039,7 +775,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         console.log(`transfer out tx: ${tx}`);
 
         console.log(`========== transfer in ==========`);
-        let uuid2 = generateUuid(
+        let uuid2 = generateUuidSol(
             lp.publicKey,
             user.publicKey,
             lock.hash,
@@ -1047,8 +783,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
             lock.expectedSingleStepTime,
             lock.tolerantSingleStepTime,
             lock.earliestRefundTime,
-            mint2,
-            tokenAmountBack,
             solAmountBack,
         );
         console.log(`generate uuid2: ${uuid2}`);
@@ -1057,25 +791,15 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
         console.log(`offchain escrow2: ${escrow2}`);
 
-        // calculate escrowAtaTokenAccount account address offchain without create it
-        let escrow2AtaTokenAccount = getAssociatedTokenAddressSync(mint2, escrow2, true);
-        console.log(`offchain escrow2 ata ${escrow2AtaTokenAccount}`);
-
         // lp response to the swap initiated by user (transfer in)
         const tx2 = await program.methods
-            .prepare(uuid2, user.publicKey, solAmountBack, tokenAmountBack, lock, isIn, memo)
+            .prepare(uuid2, user.publicKey, solAmountBack, lock, isIn, memo)
             .accounts({
                 payer: lp.publicKey,
                 from: lp.publicKey,
-                mint: mint2,
-                source: lpAtaTokenMint2Account.address,
                 escrow: escrow2,
-                escrowAta: escrow2AtaTokenAccount,
                 adminSettings: adminSettings,
-                tokenSettings: null,
-                associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
                 systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
             })
             .signers([lp])
             .rpc();
@@ -1084,16 +808,6 @@ describe("SPL A token <-> SPL B token + SOL", () => {
 
         console.log(`========== try to confirm transfer out by using confirm in function ==========`);
 
-        // lp token mint1 ata address
-        let lpAtaTokenMint1Account = await getOrCreateAssociatedTokenAccount(connection, payer, mint1, lp.publicKey);
-
-        // fee recepient mint1 ata address
-        let feeMin1Destination = await getOrCreateAssociatedTokenAccount(
-            connection,
-            payer,
-            mint1,
-            feeRecepient.publicKey,
-        );
         // user cannot confirm the swap by using confirm in function
         try {
             const tx3 = await program.methods
@@ -1102,14 +816,10 @@ describe("SPL A token <-> SPL B token + SOL", () => {
                     payer: user.publicKey,
                     from: user.publicKey,
                     to: lp.publicKey,
-                    destination: lpAtaTokenMint1Account.address,
                     escrow: escrow1,
-                    escrowAta: escrow1AtaTokenAccount,
                     adminSettings: adminSettings,
                     feeRecepient: feeRecepient.publicKey,
-                    feeDestination: feeMin1Destination.address,
                     systemProgram: web3.SystemProgram.programId,
-                    tokenProgram: TOKEN_PROGRAM_ID,
                 })
                 .signers([user])
                 .rpc();

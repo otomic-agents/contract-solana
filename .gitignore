@@ -9,6 +9,7 @@ test-ledger
 
 target/deploy/obridge-keypair.json
 target/deploy/obridge_sol-keypair.json 
+target/deploy/obridge_swap-keypair.json 
 target/release
 target/sbf-solana-solana
 target/.rustc_info.json

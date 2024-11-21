@@ -7,7 +7,7 @@ declare_id!("7AqTXFCDLKm3rxfyHWfbZ3Lox91D2qK6GHYMrhPHYfDW");
 const ADMIN_SETTINGS_SEED: &[u8] = b"settings";
 
 #[program]
-pub mod obridge {
+pub mod obridge_sol {
     use anchor_lang::system_program;
 
     use super::*;

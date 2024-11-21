@@ -7,10 +7,12 @@ skip-lint = false
 [programs.localnet]
 obridge = "FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo"
 obridge_sol = "7AqTXFCDLKm3rxfyHWfbZ3Lox91D2qK6GHYMrhPHYfDW"
+obridge_swap = "DnSgZFH2hMgZ7bXmJUdcL8bgB1MgDpVtddNhwzZACTKQ"
 
 [programs.devnet]
 obridge = "FAqaHQHgBFFX8fJB6fQUqNdc8zABV5pGVRdCt7fLLYVo"
 obridge_sol = "7AqTXFCDLKm3rxfyHWfbZ3Lox91D2qK6GHYMrhPHYfDW"
+obridge_swap = "DnSgZFH2hMgZ7bXmJUdcL8bgB1MgDpVtddNhwzZACTKQ"
 
 [registry]
 url = "https://api.apr.dev"

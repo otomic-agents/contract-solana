@@ -154,3 +154,26 @@ export function generateUuidSol(
     ]);
     return Array.from(keccak_256(data));
 }
+
+export function generateUuidSwap(
+    sender: web3.PublicKey,
+    receiver: web3.PublicKey,
+    srcToken: web3.PublicKey,
+    srcTokenAmount: BN,
+    destToken: web3.PublicKey,
+    destTokenAmount: BN,
+    agreementReachedTime: BN,
+    stepTime: BN,
+): number[] {
+    let data = Buffer.concat([
+        sender.toBuffer(),
+        receiver.toBuffer(),
+        srcToken.toBuffer(),
+        Buffer.from(srcTokenAmount.toArrayLike(Buffer, "le", 64)),
+        destToken.toBuffer(),
+        Buffer.from(destTokenAmount.toArrayLike(Buffer, "le", 64)),
+        Buffer.from(agreementReachedTime.toArrayLike(Buffer, "le", 64)),
+        Buffer.from(stepTime.toArrayLike(Buffer, "le", 16)),
+    ]);
+    return Array.from(keccak_256(data));
+}

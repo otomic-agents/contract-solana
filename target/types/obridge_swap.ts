@@ -132,7 +132,7 @@ export type ObridgeSwap = {
       ]
     },
     {
-      "name": "prepare",
+      "name": "submitSwap",
       "accounts": [
         {
           "name": "payer",
@@ -244,7 +244,7 @@ export type ObridgeSwap = {
       ]
     },
     {
-      "name": "confirm",
+      "name": "confirmSwap",
       "accounts": [
         {
           "name": "payer",
@@ -337,7 +337,7 @@ export type ObridgeSwap = {
       ]
     },
     {
-      "name": "refund",
+      "name": "refundSwap",
       "accounts": [
         {
           "name": "from",
@@ -677,7 +677,7 @@ export const IDL: ObridgeSwap = {
       ]
     },
     {
-      "name": "prepare",
+      "name": "submitSwap",
       "accounts": [
         {
           "name": "payer",
@@ -789,7 +789,7 @@ export const IDL: ObridgeSwap = {
       ]
     },
     {
-      "name": "confirm",
+      "name": "confirmSwap",
       "accounts": [
         {
           "name": "payer",
@@ -882,7 +882,7 @@ export const IDL: ObridgeSwap = {
       ]
     },
     {
-      "name": "refund",
+      "name": "refundSwap",
       "accounts": [
         {
           "name": "from",

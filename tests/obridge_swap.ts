@@ -160,7 +160,7 @@ describe("OBridge Swap", () => {
             throw new Error("agreementReachedTime is null");
         }
 
-        console.log(`========== prepare ==========`);
+        console.log(`========== submitSwap ==========`);
 
         let stepTime = 5;
 
@@ -195,7 +195,7 @@ describe("OBridge Swap", () => {
         // got error before initialize program
         try {
             await program.methods
-                .prepare(uuid1, amount, amountBack, lock, memo)
+                .submitSwap(uuid1, amount, amountBack, lock, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
@@ -295,7 +295,7 @@ describe("OBridge Swap", () => {
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -320,7 +320,7 @@ describe("OBridge Swap", () => {
         // try to use same uuid for wrong test
         try {
             await program.methods
-                .prepare(uuid1, amount, amountBack, lock, memo)
+                .submitSwap(uuid1, amount, amountBack, lock, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
@@ -346,11 +346,11 @@ describe("OBridge Swap", () => {
             expect((err as AnchorError).logs).not.to.be.empty;
         }
 
-        console.log(`========== confirm ==========`);
+        console.log(`========== confirmSwap ==========`);
 
-        // lp confirm the swap initiated by user (prepare)
+        // lp confirmSwap the swap initiated by user (submitSwap)
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -370,7 +370,7 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let userMint1BalAfter = new BN(
             (await getAccount(connection, userAtaTokenMint1Account.address)).amount.toString(),
@@ -433,7 +433,7 @@ describe("OBridge Swap", () => {
         const zeroPublicKey = new web3.PublicKey(new Uint8Array(32).fill(0));
         console.log(`zero public key: ${zeroPublicKey.toBase58()}`);
 
-        console.log(`========== prepare ==========`);
+        console.log(`========== submitSwap ==========`);
         let uuid1 = generateUuidSwap(
             user.publicKey,
             lp.publicKey,
@@ -453,7 +453,7 @@ describe("OBridge Swap", () => {
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -475,11 +475,11 @@ describe("OBridge Swap", () => {
 
         console.log(`transfer out tx: ${tx}`);
 
-        console.log(`========== confirm ==========`);
+        console.log(`========== confirmSwap ==========`);
 
-        // lp confirm the swap initiated by user (prepare)
+        // lp confirmSwap the swap initiated by user (submitSwap)
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -499,7 +499,7 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let feeMint1 = amount.mul(new BN(1000)).div(new BN(10000));
         let feeMint2 = amountBack.mul(new BN(1000)).div(new BN(10000));
@@ -565,7 +565,7 @@ describe("OBridge Swap", () => {
         const zeroPublicKey = new web3.PublicKey(new Uint8Array(32).fill(0));
         console.log(`zero public key: ${zeroPublicKey.toBase58()}`);
 
-        console.log(`========== prepare ==========`);
+        console.log(`========== submitSwap ==========`);
         let uuid1 = generateUuidSwap(
             user.publicKey,
             lp.publicKey,
@@ -590,7 +590,7 @@ describe("OBridge Swap", () => {
 
         // got error before initialize program
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -611,7 +611,7 @@ describe("OBridge Swap", () => {
             .rpc();
         console.log(`transfer out tx: ${tx}`);
 
-        console.log(`========== confirm ==========`);
+        console.log(`========== confirmSwap ==========`);
 
         // user token mint2 ata address
         let userAtaTokenMint2Account = await getOrCreateAssociatedTokenAccount(
@@ -640,9 +640,9 @@ describe("OBridge Swap", () => {
             feeRecepient.publicKey,
         );
 
-        // lp confirm the swap initiated by user (prepare)
+        // lp confirmSwap the swap initiated by user (submitSwap)
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -662,7 +662,7 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let feeMint1 = amount.mul(new BN(1000)).div(new BN(10000));
         let feeMint2 = amountBack.mul(new BN(1000)).div(new BN(10000));
@@ -712,7 +712,7 @@ describe("OBridge Swap", () => {
         };
         console.log(`lock: ${JSON.stringify(lock)}`);
 
-        console.log(`========== prepare ==========`);
+        console.log(`========== submitSwap ==========`);
         let uuid1 = generateUuidSwap(
             user.publicKey,
             lp.publicKey,
@@ -736,7 +736,7 @@ describe("OBridge Swap", () => {
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -757,11 +757,11 @@ describe("OBridge Swap", () => {
             .rpc();
         console.log(`transfer out tx: ${tx}`);
 
-        console.log(`========== refund ==========`);
+        console.log(`========== refundSwap ==========`);
 
         try {
             await program.methods
-            .refund(uuid1)
+            .refundSwap(uuid1)
             .accounts({
                 from: user.publicKey,
                 source: userAtaTokenMint1Account.address,
@@ -794,7 +794,7 @@ describe("OBridge Swap", () => {
         }
 
         const tx2 = await program.methods
-            .refund(uuid1)
+            .refundSwap(uuid1)
             .accounts({
                 from: user.publicKey,
                 source: userAtaTokenMint1Account.address,
@@ -805,7 +805,7 @@ describe("OBridge Swap", () => {
             })
             .rpc();
 
-        console.log(`refund tx: ${tx2}`);
+        console.log(`refundSwap tx: ${tx2}`);
     });
 
     it("refund SOL <-> SPL B Token", async () => {
@@ -827,7 +827,7 @@ describe("OBridge Swap", () => {
         const zeroPublicKey = new web3.PublicKey(new Uint8Array(32).fill(0));
         console.log(`zero public key: ${zeroPublicKey.toBase58()}`);
 
-        console.log(`========== prepare ==========`);
+        console.log(`========== submitSwap ==========`);
         let uuid1 = generateUuidSwap(
             user.publicKey,
             lp.publicKey,
@@ -851,7 +851,7 @@ describe("OBridge Swap", () => {
         let memo = Buffer.from([1, 2, 3, 4, 5]);
 
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -872,7 +872,7 @@ describe("OBridge Swap", () => {
             .rpc();
         console.log(`transfer out tx: ${tx}`);
 
-        console.log(`========== refund ==========`);
+        console.log(`========== refundSwap ==========`);
 
         let refundTime = lock.agreementReachedTime.add(lock.stepTime.mul(new BN(2))).add(new BN(1));
         console.log(`wait until the refund window: ${refundTime.toNumber()}`);
@@ -890,7 +890,7 @@ describe("OBridge Swap", () => {
         }
 
         const tx2 = await program.methods
-            .refund(uuid1)
+            .refundSwap(uuid1)
             .accounts({
                 from: user.publicKey,
                 source: null,
@@ -901,7 +901,7 @@ describe("OBridge Swap", () => {
             })
             .rpc();
 
-        console.log(`refund tx: ${tx2}`);
+        console.log(`refundSwap tx: ${tx2}`);
     });
 
     it("set token max fee", async () => {
@@ -979,7 +979,7 @@ describe("OBridge Swap", () => {
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -1002,7 +1002,7 @@ describe("OBridge Swap", () => {
         console.log(`transfer out tx: ${tx}`);
 
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -1022,7 +1022,7 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let feeRecepientMint1After = new BN(
             (await getAccount(connection, feeMint1Destination.address)).amount.toString(),
@@ -1096,7 +1096,7 @@ describe("OBridge Swap", () => {
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -1119,7 +1119,7 @@ describe("OBridge Swap", () => {
         console.log(`transfer out tx: ${tx}`);
 
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -1139,7 +1139,7 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let feeRecepientSOLAfter = new BN(await connection.getBalance(feeRecepient.publicKey));
 
@@ -1196,7 +1196,7 @@ describe("OBridge Swap", () => {
 
         // transfer out
         tx = await program.methods
-            .prepare(uuid1, amount, amountBack, lock, memo)
+            .submitSwap(uuid1, amount, amountBack, lock, memo)
             .accounts({
                 payer: user.publicKey,
                 from: user.publicKey,
@@ -1219,7 +1219,7 @@ describe("OBridge Swap", () => {
         console.log(`transfer out tx: ${tx}`);
 
         const tx2 = await program.methods
-            .confirm(uuid1)
+            .confirmSwap(uuid1)
             .accounts({
                 payer: lp.publicKey,
                 from: user.publicKey,
@@ -1239,14 +1239,14 @@ describe("OBridge Swap", () => {
             .signers([lp])
             .rpc();
 
-        console.log(`confirm tx: ${tx2}`);
+        console.log(`confirmSwap tx: ${tx2}`);
 
         let feeRecepientSOLAfter = new BN(await connection.getBalance(feeRecepient.publicKey));
 
         expect(feeRecepientSOLAfter.sub(feeRecepientSOLBefore).toString()).to.be.eq(maxFeeForMint2.toString());
     });
 
-    it("cannot call prepare after deadline", async () => {
+    it("cannot call submitSwap after deadline", async () => {
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
@@ -1288,7 +1288,7 @@ describe("OBridge Swap", () => {
 
         try {
             tx = await program.methods
-                .prepare(uuid1, amount, amountBack, lock, memo)
+                .submitSwap(uuid1, amount, amountBack, lock, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,
@@ -1315,7 +1315,7 @@ describe("OBridge Swap", () => {
         }
     });
 
-    it("cannot call prepare with amount 0", async () => {
+    it("cannot call submitSwap with amount 0", async () => {
         let slot = await connection.getSlot();
         let agreementReachedTime = await connection.getBlockTime(slot);
         if (!agreementReachedTime) {
@@ -1355,7 +1355,7 @@ describe("OBridge Swap", () => {
         try {
             await program.methods;
             tx = await program.methods
-                .prepare(uuid1, new BN(0), new BN(0), lock, memo)
+                .submitSwap(uuid1, new BN(0), new BN(0), lock, memo)
                 .accounts({
                     payer: user.publicKey,
                     from: user.publicKey,

@@ -8,11 +8,112 @@ declare_id!("DnSgZFH2hMgZ7bXmJUdcL8bgB1MgDpVtddNhwzZACTKQ");
 const ADMIN_SETTINGS_SEED: &[u8] = b"settings";
 const TOKEN_SETTINGS_SEED_PREFIX: &[u8] = b"token";
 
-#[program]
-pub mod obridge_swap {
+mod helpers {
+    use super::*;
     use anchor_lang::system_program;
 
+    pub fn handle_token_transfer<'info>(
+        token_program: &Program<'info, Token>,
+        from: &AccountInfo<'info>,
+        to: &AccountInfo<'info>,
+        authority: &AccountInfo<'info>,
+        amount: u64,
+        seeds: Option<&[&[&[u8]]]>,
+    ) -> Result<()> {
+        let transfer_ctx = CpiContext::new(
+            token_program.to_account_info(),
+            token::Transfer {
+                from: from.to_account_info(),
+                to: to.to_account_info(),
+                authority: authority.to_account_info(),
+            },
+        );
+
+        if let Some(seeds) = seeds {
+            token::transfer(
+                CpiContext::new_with_signer(
+                    token_program.to_account_info(),
+                    transfer_ctx.accounts,
+                    seeds,
+                ),
+                amount,
+            )
+        } else {
+            token::transfer(transfer_ctx, amount)
+        }
+    }
+
+    pub fn handle_sol_transfer<'info>(
+        from: &AccountInfo<'info>,
+        to: &AccountInfo<'info>,
+        system_program: &AccountInfo<'info>,
+        amount: u64,
+    ) -> Result<()> {
+        system_program::transfer(
+            CpiContext::new(
+                system_program.clone(),
+                system_program::Transfer {
+                    from: from.to_account_info(),
+                    to: to.to_account_info(),
+                },
+            ),
+            amount,
+        )
+    }
+
+    pub fn verify_token_settings(
+        token: Option<&Account<Mint>>,
+        token_settings: Option<&Account<TokenSettings>>,
+        program_id: &Pubkey,
+    ) -> Result<()> {
+        if let Some(settings) = token_settings {
+            let (expected_settings, _) = if let Some(token) = token {
+                Pubkey::find_program_address(
+                    &[
+                        TOKEN_SETTINGS_SEED_PREFIX,
+                        &token.to_account_info().key().to_bytes(),
+                    ],
+                    program_id,
+                )
+            } else {
+                Pubkey::find_program_address(&[TOKEN_SETTINGS_SEED_PREFIX, &[0u8; 32]], program_id)
+            };
+            require!(
+                settings.key() == expected_settings,
+                Errors::InvalidTokenSettings
+            );
+        }
+        Ok(())
+    }
+
+    pub fn calculate_fee(amount: u64, fee_rate_bp: u16, max_fee: Option<u64>) -> u64 {
+        let mut fee = amount * fee_rate_bp as u64 / 10000;
+        if let Some(max) = max_fee {
+            if max > 0 && fee > max {
+                fee = max;
+            }
+        }
+        fee
+    }
+
+    pub fn close_escrow_account<'info>(
+        escrow: &Account<'info, Escrow>,
+        from: &AccountInfo<'info>,
+        from_add_lamports: u64,
+        escrow_minus_lamports: u64,
+    ) -> Result<()> {
+        from.add_lamports(from_add_lamports)?;
+        escrow.sub_lamports(escrow_minus_lamports)?;
+        escrow.to_account_info().assign(&system_program::ID);
+        Ok(escrow.to_account_info().realloc(0, false)?)
+    }
+}
+
+#[program]
+pub mod obridge_swap {
+
     use super::*;
+    use helpers::*;
 
     pub fn initialize(ctx: Context<Initialize>, admin: Pubkey) -> Result<()> {
         ctx.accounts.admin_settings.admin = admin;
@@ -43,8 +144,8 @@ pub mod obridge_swap {
         Ok(())
     }
 
-    pub fn prepare(
-        ctx: Context<Prepare>,
+    pub fn submit_swap(
+        ctx: Context<SubmitSwap>,
         _uuid: [u8; 32],
         src_amount: u64,
         dst_amount: u64,
@@ -64,111 +165,51 @@ pub mod obridge_swap {
             Errors::DeadlineExceeded
         );
 
-        let fee_rate_bp = ctx.accounts.admin_settings.fee_rate_bp as u64;
-        let mut src_token_fee = src_amount * fee_rate_bp / 10000;
-        if ctx.accounts.src_token_settings.is_some() {
-            if ctx.accounts.src_token.is_some() {
-                let src_token = ctx.accounts.src_token.as_ref().unwrap();
-                let (expected_src_token_settings, _bump) = Pubkey::find_program_address(
-                    &[
-                        TOKEN_SETTINGS_SEED_PREFIX,
-                        &src_token.to_account_info().key().to_bytes(),
-                    ],
-                    &ctx.program_id,
-                );
-                require!(
-                    ctx.accounts.src_token_settings.as_ref().unwrap().key()
-                        == expected_src_token_settings,
-                    Errors::InvalidTokenSettings
-                );
-            } else {
-                let zero_buffer: [u8; 32] = [0u8; 32];
-                let (expected_src_token_settings, _bump) = Pubkey::find_program_address(
-                    &[TOKEN_SETTINGS_SEED_PREFIX, &zero_buffer],
-                    &ctx.program_id,
-                );
-                require!(
-                    ctx.accounts.src_token_settings.as_ref().unwrap().key()
-                        == expected_src_token_settings,
-                    Errors::InvalidTokenSettings
-                );
-            }
-            let max_fee = ctx.accounts.src_token_settings.as_ref().unwrap().max_fee;
-            if max_fee > 0 && src_token_fee > max_fee {
-                src_token_fee = max_fee;
-            }
-        }
+        // Verify token settings and calculate fees
+        verify_token_settings(
+            ctx.accounts.src_token.as_ref(),
+            ctx.accounts.src_token_settings.as_ref(),
+            &ctx.program_id,
+        )?;
+        verify_token_settings(
+            ctx.accounts.dst_token.as_ref(),
+            ctx.accounts.dst_token_settings.as_ref(),
+            &ctx.program_id,
+        )?;
 
-        let mut dst_token_fee = dst_amount * fee_rate_bp / 10000;
-        if ctx.accounts.dst_token_settings.is_some() {
-            if ctx.accounts.dst_token.is_some() {
-                let dst_token = ctx.accounts.dst_token.as_ref().unwrap();
-                let (expected_dst_token_settings, _bump) = Pubkey::find_program_address(
-                    &[
-                        TOKEN_SETTINGS_SEED_PREFIX,
-                        &dst_token.to_account_info().key().to_bytes(),
-                    ],
-                    &ctx.program_id,
-                );
-                require!(
-                    ctx.accounts.dst_token_settings.as_ref().unwrap().key()
-                        == expected_dst_token_settings,
-                    Errors::InvalidTokenSettings
-                );
-            } else {
-                let zero_buffer: [u8; 32] = [0u8; 32];
-                let (expected_dst_token_settings, _bump) = Pubkey::find_program_address(
-                    &[TOKEN_SETTINGS_SEED_PREFIX, &zero_buffer],
-                    &ctx.program_id,
-                );
-                require!(
-                    ctx.accounts.dst_token_settings.as_ref().unwrap().key()
-                        == expected_dst_token_settings,
-                    Errors::InvalidTokenSettings
-                );
-            }
-            let max_fee = ctx.accounts.dst_token_settings.as_ref().unwrap().max_fee;
-            if max_fee > 0 && dst_token_fee > max_fee {
-                dst_token_fee = max_fee;
-            }
-        }
+        let fee_rate_bp = ctx.accounts.admin_settings.fee_rate_bp;
+        let src_token_fee = calculate_fee(
+            src_amount,
+            fee_rate_bp,
+            ctx.accounts.src_token_settings.as_ref().map(|s| s.max_fee),
+        );
+        let dst_token_fee = calculate_fee(
+            dst_amount,
+            fee_rate_bp,
+            ctx.accounts.dst_token_settings.as_ref().map(|s| s.max_fee),
+        );
 
-        // src token is SPL Token
-        if ctx.accounts.src_token.is_some()
-            && ctx.accounts.source.is_some()
-            && ctx.accounts.escrow_ata.is_some()
-            && ctx.accounts.token_program.is_some()
-            && ctx.accounts.associated_token_program.is_some()
-        {
-            token::transfer(
-                CpiContext::new(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.source.as_ref().unwrap().to_account_info(),
-                        to: ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
-                        authority: ctx.accounts.from.to_account_info(),
-                    },
-                ),
+        // Handle token transfers
+        if ctx.accounts.src_token.is_some() {
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.source.as_ref().unwrap().to_account_info(),
+                &ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
+                &ctx.accounts.from.to_account_info(),
                 src_amount,
+                None,
             )?;
         } else {
-            // src token is SOL
-            system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    system_program::Transfer {
-                        from: ctx.accounts.from.to_account_info(),
-                        to: ctx.accounts.escrow.to_account_info(),
-                    },
-                ),
+            // Handle SOL transfer
+            handle_sol_transfer(
+                &ctx.accounts.from.to_account_info(),
+                &ctx.accounts.escrow.to_account_info(),
+                &ctx.accounts.system_program.to_account_info(),
                 src_amount,
             )?;
         }
 
+        // Update escrow account
         let escrow = &mut ctx.accounts.escrow;
         escrow.from = ctx.accounts.from.key();
         escrow.to = ctx.accounts.to.key();
@@ -177,34 +218,21 @@ pub mod obridge_swap {
         escrow.src_token_fee = src_token_fee;
         escrow.dst_token_fee = dst_token_fee;
         escrow.lock = lock;
-
-        let zero_pubkey = Pubkey::new_from_array([0; 32]);
-
-        if ctx.accounts.src_token.is_some() {
-            escrow.src_token = ctx.accounts.src_token.as_ref().unwrap().key();
-        } else {
-            escrow.src_token = zero_pubkey
-        }
-
-        if ctx.accounts.dst_token.is_some() {
-            escrow.dst_token = ctx.accounts.dst_token.as_ref().unwrap().key();
-        } else {
-            escrow.dst_token = zero_pubkey
-        }
-
-        msg!("Escrow account from: {:?}", escrow.from);
-        msg!("Escrow account to: {:?}", escrow.to);
-        msg!("Escrow account src_token: {:?}", escrow.src_token);
-        msg!("Escrow account src_amount: {:?}", escrow.src_amount);
-        msg!("Escrow account dst_token: {:?}", escrow.dst_token);
-        msg!("Escrow account dst_amount: {:?}", escrow.dst_amount);
-        msg!("Escrow account src_token_fee: {:?}", escrow.src_token_fee);
-        msg!("Escrow account dst_token_fee: {:?}", escrow.dst_token_fee);
+        escrow.src_token = ctx
+            .accounts
+            .src_token
+            .as_ref()
+            .map_or(Pubkey::new_from_array([0; 32]), |t| t.key());
+        escrow.dst_token = ctx
+            .accounts
+            .dst_token
+            .as_ref()
+            .map_or(Pubkey::new_from_array([0; 32]), |t| t.key());
 
         Ok(())
     }
 
-    pub fn confirm(ctx: Context<Confirm>, uuid: [u8; 32]) -> Result<()> {
+    pub fn confirm_swap(ctx: Context<ConfirmSwap>, uuid: [u8; 32]) -> Result<()> {
         require!(
             ctx.accounts.payer.key() == ctx.accounts.to.key(),
             Errors::InvalidSender
@@ -219,34 +247,25 @@ pub mod obridge_swap {
         );
 
         let zero_pubkey = Pubkey::new_from_array([0; 32]);
-
         let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
 
-        // dst token is SOL
+        // Handle destination token transfers (SOL or SPL)
         if escrow.dst_token == zero_pubkey {
-            system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    system_program::Transfer {
-                        from: ctx.accounts.to.to_account_info(),
-                        to: ctx.accounts.fee_recepient.to_account_info(),
-                    },
-                ),
+            // Handle SOL transfers
+            handle_sol_transfer(
+                &ctx.accounts.to.to_account_info(),
+                &ctx.accounts.fee_recepient.to_account_info(),
+                &ctx.accounts.system_program.to_account_info(),
                 escrow.dst_token_fee,
             )?;
-
-            system_program::transfer(
-                CpiContext::new(
-                    ctx.accounts.system_program.to_account_info(),
-                    system_program::Transfer {
-                        from: ctx.accounts.to.to_account_info(),
-                        to: ctx.accounts.from.to_account_info(),
-                    },
-                ),
+            handle_sol_transfer(
+                &ctx.accounts.to.to_account_info(),
+                &ctx.accounts.from.to_account_info(),
+                &ctx.accounts.system_program.to_account_info(),
                 escrow.dst_amount - escrow.dst_token_fee,
             )?;
         } else {
-            // dst token is SPL Token
+            // Handle SPL token transfers
             require!(
                 ctx.accounts.token_program.is_some()
                     && ctx.accounts.to_source.is_some()
@@ -254,52 +273,37 @@ pub mod obridge_swap {
                     && ctx.accounts.from_destination.is_some(),
                 Errors::AccountMismatch
             );
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.to_source.as_ref().unwrap().to_account_info(),
-                        to: ctx
-                            .accounts
-                            .dst_fee_destination
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        authority: ctx.accounts.to.to_account_info(),
-                    },
-                    seeds,
-                ),
+
+            // Transfer fee
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.to_source.as_ref().unwrap().to_account_info(),
+                &ctx.accounts
+                    .dst_fee_destination
+                    .as_ref()
+                    .unwrap()
+                    .to_account_info(),
+                &ctx.accounts.to.to_account_info(),
                 escrow.dst_token_fee,
+                Some(seeds),
             )?;
 
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.to_source.as_ref().unwrap().to_account_info(),
-                        to: ctx
-                            .accounts
-                            .from_destination
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        authority: ctx.accounts.to.to_account_info(),
-                    },
-                    seeds,
-                ),
+            // Transfer amount minus fee
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.to_source.as_ref().unwrap().to_account_info(),
+                &ctx.accounts
+                    .from_destination
+                    .as_ref()
+                    .unwrap()
+                    .to_account_info(),
+                &ctx.accounts.to.to_account_info(),
                 escrow.dst_amount - escrow.dst_token_fee,
+                Some(seeds),
             )?;
         }
 
-        // src token is SOL
+        // Handle source token transfers (SOL or SPL)
         if escrow.src_token == zero_pubkey {
             ctx.accounts
                 .fee_recepient
@@ -308,17 +312,14 @@ pub mod obridge_swap {
                 .to
                 .add_lamports(escrow.src_amount - escrow.src_token_fee)?;
 
-            // delete escrow account
             let escrow_lamports = escrow.to_account_info().lamports();
-            ctx.accounts
-                .from
-                .add_lamports(escrow_lamports - escrow.src_amount)?;
-
-            escrow.sub_lamports(escrow_lamports)?;
-            escrow.to_account_info().assign(&system_program::ID);
-            escrow.to_account_info().realloc(0, false)?;
+            close_escrow_account(
+                escrow,
+                &ctx.accounts.from.to_account_info(),
+                escrow_lamports - escrow.src_amount,
+                escrow_lamports,
+            )?;
         } else {
-            // src token is SPL Token
             require!(
                 ctx.accounts.token_program.is_some()
                     && ctx.accounts.escrow_ata.is_some()
@@ -327,51 +328,34 @@ pub mod obridge_swap {
                 Errors::AccountMismatch
             );
 
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
-                        to: ctx
-                            .accounts
-                            .src_fee_destination
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        authority: escrow.to_account_info(),
-                    },
-                    seeds,
-                ),
+            // Transfer fee and remaining amount
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
+                &ctx.accounts
+                    .src_fee_destination
+                    .as_ref()
+                    .unwrap()
+                    .to_account_info(),
+                &escrow.to_account_info(),
                 escrow.src_token_fee,
+                Some(seeds),
             )?;
 
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
-                        to: ctx
-                            .accounts
-                            .to_destination
-                            .as_ref()
-                            .unwrap()
-                            .to_account_info(),
-                        authority: escrow.to_account_info(),
-                    },
-                    seeds,
-                ),
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
+                &ctx.accounts
+                    .to_destination
+                    .as_ref()
+                    .unwrap()
+                    .to_account_info(),
+                &escrow.to_account_info(),
                 escrow.src_amount - escrow.src_token_fee,
+                Some(seeds),
             )?;
 
-            // close escrow ata account and transfer remaining tokens to "from" account
+            // Close escrow ATA account
             token::close_account(CpiContext::new_with_signer(
                 ctx.accounts
                     .token_program
@@ -386,19 +370,20 @@ pub mod obridge_swap {
                 seeds,
             ))?;
 
-            // close escrow account
+            // Close escrow account
             let escrow_lamports = escrow.to_account_info().lamports();
-            ctx.accounts.from.add_lamports(escrow_lamports)?;
-
-            escrow.sub_lamports(escrow_lamports)?;
-            escrow.to_account_info().assign(&system_program::ID);
-            escrow.to_account_info().realloc(0, false)?;
+            close_escrow_account(
+                escrow,
+                &ctx.accounts.from.to_account_info(),
+                escrow_lamports,
+                escrow_lamports,
+            )?;
         }
 
         Ok(())
     }
 
-    pub fn refund(ctx: Context<Refund>, uuid: [u8; 32]) -> Result<()> {
+    pub fn refund_swap(ctx: Context<RefundSwap>, uuid: [u8; 32]) -> Result<()> {
         let escrow = &mut ctx.accounts.escrow;
         let timestamp = Clock::get()?.unix_timestamp;
 
@@ -408,11 +393,9 @@ pub mod obridge_swap {
         );
 
         let zero_pubkey = Pubkey::new_from_array([0; 32]);
-
         let seeds: &[&[&[u8]]] = &[&[&uuid, &[Pubkey::find_program_address(&[&uuid], &id()).1]]];
 
         if escrow.src_token != zero_pubkey {
-            // src token is SPL Token
             require!(
                 ctx.accounts.token_program.is_some()
                     && ctx.accounts.escrow_ata.is_some()
@@ -420,24 +403,17 @@ pub mod obridge_swap {
                 Errors::AccountMismatch
             );
 
-            token::transfer(
-                CpiContext::new_with_signer(
-                    ctx.accounts
-                        .token_program
-                        .as_ref()
-                        .unwrap()
-                        .to_account_info(),
-                    token::Transfer {
-                        from: ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
-                        to: ctx.accounts.source.as_ref().unwrap().to_account_info(),
-                        authority: escrow.to_account_info(),
-                    },
-                    seeds,
-                ),
+            // Transfer all tokens back
+            handle_token_transfer(
+                ctx.accounts.token_program.as_ref().unwrap(),
+                &ctx.accounts.escrow_ata.as_ref().unwrap().to_account_info(),
+                &ctx.accounts.source.as_ref().unwrap().to_account_info(),
+                &escrow.to_account_info(),
                 escrow.src_amount,
+                Some(seeds),
             )?;
 
-            // close escrow ata account and transfer remaining tokens to "from" account
+            // Close escrow ATA account
             token::close_account(CpiContext::new_with_signer(
                 ctx.accounts
                     .token_program
@@ -453,13 +429,14 @@ pub mod obridge_swap {
             ))?;
         }
 
-        // refund SOL token and close escrow account
+        // Close escrow account and refund SOL
         let escrow_lamports = escrow.to_account_info().lamports();
-        ctx.accounts.from.add_lamports(escrow_lamports)?;
-
-        escrow.sub_lamports(escrow_lamports)?;
-        escrow.to_account_info().assign(&system_program::ID);
-        escrow.to_account_info().realloc(0, false)?;
+        close_escrow_account(
+            escrow,
+            &ctx.accounts.from.to_account_info(),
+            escrow_lamports,
+            escrow_lamports,
+        )?;
 
         Ok(())
     }
@@ -564,7 +541,7 @@ pub struct SetMaxFeeForToken<'info> {
 
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 32])]
-pub struct Prepare<'info> {
+pub struct SubmitSwap<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
@@ -594,7 +571,7 @@ pub struct Prepare<'info> {
 
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 32])]
-pub struct Confirm<'info> {
+pub struct ConfirmSwap<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
     #[account(mut)]
@@ -637,7 +614,7 @@ pub struct Confirm<'info> {
 
 #[derive(Accounts)]
 #[instruction(uuid: [u8; 32])]
-pub struct Refund<'info> {
+pub struct RefundSwap<'info> {
     #[account(mut)]
     pub from: SystemAccount<'info>,
     #[account(mut)]

@@ -31,7 +31,7 @@ type Lock = {
     earliestRefundTime: BN;
 };
 
-describe("SPL A token <-> SPL B token + SOL", () => {
+describe("OBridge", () => {
     // Configure the client to use the local cluster.
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
@@ -162,7 +162,7 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let expectedSingleStepTime = 5;
         let tolerantSingleStepTime = 10;
 
-        let lock = {
+        let lock: Lock = {
             hash: hashlock,
             agreementReachedTime: new BN(agreementReachedTime),
             expectedSingleStepTime: new BN(expectedSingleStepTime),
@@ -500,6 +500,177 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         expect(feeRecepientMint1BalAfter.sub(feeRecepientMint1BalBefore).toString()).to.be.eq(feeMint1.toString());
         expect(feeRecepientMint2BalAfter.sub(feeRecepientMint2BalBefore).toString()).to.be.eq(feeMint2.toString());
         expect(feeRecepientSOLBalAfter.sub(feeRecepientSOLBalBefore).toString()).to.be.eq(feeSOL.toString());
+    });
+
+    it("swap SOL <-> SOL", async () => {
+        let userSOLBalBefore = new BN(await connection.getBalance(user.publicKey));
+        let lpSOLBalBefore = new BN(await connection.getBalance(lp.publicKey));
+        let feeRecepientSOLBalBefore = new BN(await connection.getBalance(feeRecepient.publicKey));
+
+        let slot = await connection.getSlot();
+        let agreementReachedTime = await connection.getBlockTime(slot);
+        if (!agreementReachedTime) {
+            throw new Error("agreementReachedTime is null");
+        }
+
+        let expectedSingleStepTime = 5;
+        let tolerantSingleStepTime = 10;
+
+        let lock: Lock = {
+            hash: hashlock,
+            agreementReachedTime: new BN(agreementReachedTime),
+            expectedSingleStepTime: new BN(expectedSingleStepTime),
+            tolerantSingleStepTime: new BN(tolerantSingleStepTime),
+            earliestRefundTime: new BN(
+                agreementReachedTime + 3 * expectedSingleStepTime + 3 * tolerantSingleStepTime + 1,
+            ),
+        };
+        console.log(`lock: ${JSON.stringify(lock)}`);
+
+        const ZERO_PUBKEY = new web3.PublicKey(new Uint8Array(32).fill(0));
+        const fakeMint = ZERO_PUBKEY;
+        const solAmount1 = new BN(2 * 10 ** 9);
+        const tokenAmount1 = new BN(0);
+        // set fee rate to 20% already in previous test
+        const feeSOL = solAmount1.mul(new BN(2000)).div(new BN(10000));
+
+        console.log(`========== transfer out ==========`);
+        let uuid1 = generateUuid(
+            user.publicKey,
+            lp.publicKey,
+            lock.hash,
+            lock.agreementReachedTime,
+            lock.expectedSingleStepTime,
+            lock.tolerantSingleStepTime,
+            lock.earliestRefundTime,
+            fakeMint,
+            tokenAmount1,
+            solAmount1,
+        );
+        console.log(`generate uuid1: ${uuid1}`);
+
+        // calculate escrow account address offchain without create it
+        let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
+        console.log(`offchain escrow1: ${escrow1}`);
+
+        let memo = Buffer.from([1, 2, 3, 4, 5]);
+
+        // transfer out
+        tx = await program.methods
+            .prepare(uuid1, lp.publicKey, solAmount1, tokenAmount1, lock, isOut, memo)
+            .accounts({
+                payer: user.publicKey,
+                from: user.publicKey,
+                mint: null,
+                source: null,
+                escrow: escrow1,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                tokenSettings: null,
+                associatedTokenProgram: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([user])
+            .rpc();
+
+        console.log(`transfer out tx: ${tx}`);
+
+        console.log(`========== transfer in ==========`);
+        let uuid2 = generateUuid(
+            lp.publicKey,
+            user.publicKey,
+            lock.hash,
+            lock.agreementReachedTime,
+            lock.expectedSingleStepTime,
+            lock.tolerantSingleStepTime,
+            lock.earliestRefundTime,
+            fakeMint,
+            tokenAmount1,
+            solAmount1,
+        );
+        console.log(`generate uuid2: ${uuid2}`);
+
+        // calculate escrow account address offchain without create it
+        let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
+        console.log(`offchain escrow2: ${escrow2}`);
+
+        // lp response to the swap initiated by user (transfer in)
+        const tx2 = await program.methods
+            .prepare(uuid2, user.publicKey, solAmount1, tokenAmount1, lock, isIn, memo)
+            .accounts({
+                payer: lp.publicKey,
+                from: lp.publicKey,
+                mint: null,
+                source: null,
+                escrow: escrow2,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                tokenSettings: null,
+                associatedTokenProgram: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([lp])
+            .rpc();
+
+        console.log(`transfer in tx: ${tx2}`);
+
+        console.log(`========== confirm transfer out ==========`);
+
+        // user confirm the swap (transfer out)
+        const tx3 = await program.methods
+            .confirm(uuid1, preimage, isOut)
+            .accounts({
+                payer: user.publicKey,
+                from: user.publicKey,
+                to: lp.publicKey,
+                destination: null,
+                escrow: escrow1,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                feeRecepient: feeRecepient.publicKey,
+                feeDestination: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([user])
+            .rpc();
+
+        console.log(`confirm transfer out tx: ${tx3}`);
+
+        console.log(`========== confirm transfer in ==========`);
+        // lp confirm the swap (transfer in)
+        const tx4 = await program.methods
+            .confirm(uuid2, preimage, isIn)
+            .accounts({
+                payer: lp.publicKey,
+                from: lp.publicKey,
+                to: user.publicKey,
+                destination: null,
+                escrow: escrow2,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                feeRecepient: feeRecepient.publicKey,
+                feeDestination: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([lp])
+            .rpc();
+
+        console.log(`confirm transfer in tx: ${tx4}`);
+
+        let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
+        expect(userSOLBalBefore.sub(userSOLBalAfter).toNumber()).to.be.eq(feeSOL.toNumber());
+
+        let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
+        expect(lpSOLBalBefore.sub(lpSOLBalAfter).toNumber()).to.be.eq(feeSOL.toNumber());
+
+        let feeRecepientSOLBalAfter = new BN(await connection.getBalance(feeRecepient.publicKey));
+        expect(feeRecepientSOLBalAfter.sub(feeRecepientSOLBalBefore).toString()).to.be.eq(
+            feeSOL.mul(new BN(2)).toString(),
+        );
     });
 
     it("cannot call initiate after deadline", async () => {
@@ -841,6 +1012,188 @@ describe("SPL A token <-> SPL B token + SOL", () => {
         let lpMint2BalAfter = new BN((await getAccount(connection, lpAtaTokenMint2Account.address)).amount.toString());
         let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
         expect(lpMint2BalAfter.toString()).to.be.eq(lpMint2BalBefore.toString());
+        expect(lpSOLBalBefore.toNumber()).to.be.eq(lpSOLBalAfter.toNumber());
+    });
+
+    it("refund SOL <-> SOL", async () => {
+        let slot = await connection.getSlot();
+        let agreementReachedTime = await connection.getBlockTime(slot);
+        if (!agreementReachedTime) {
+            throw new Error("agreementReachedTime is null");
+        }
+
+        let expectedSingleStepTime = 1;
+        let tolerantSingleStepTime = 1;
+        let earliestRefundTime = agreementReachedTime + 3 * expectedSingleStepTime + 3 * tolerantSingleStepTime + 1;
+
+        let lock = {
+            hash: hashlock,
+            agreementReachedTime: new BN(agreementReachedTime),
+            expectedSingleStepTime: new BN(expectedSingleStepTime),
+            tolerantSingleStepTime: new BN(tolerantSingleStepTime),
+            earliestRefundTime: new BN(earliestRefundTime),
+        };
+        console.log(`lock: ${JSON.stringify(lock)}`);
+
+        const ZERO_PUBKEY = new web3.PublicKey(new Uint8Array(32).fill(0));
+        const fakeMint = ZERO_PUBKEY;
+        const solAmount1 = new BN(2 * 10 ** 9);
+        const tokenAmount1 = new BN(0);
+
+        let uuid1 = generateUuid(
+            user.publicKey,
+            lp.publicKey,
+            lock.hash,
+            lock.agreementReachedTime,
+            lock.expectedSingleStepTime,
+            lock.tolerantSingleStepTime,
+            lock.earliestRefundTime,
+            fakeMint,
+            tokenAmount1,
+            solAmount1,
+        );
+        console.log(`generate uuid1: ${uuid1}`);
+
+        // calculate escrow account address offchain without create it
+        let [escrow1] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid1)], program.programId);
+        console.log(`offchain escrow1: ${escrow1}`);
+
+        let memo = Buffer.from([1, 2, 3, 4, 5]);
+
+        let userSOLBalBefore = new BN(await connection.getBalance(user.publicKey));
+        let lpSOLBalBefore = new BN(await connection.getBalance(lp.publicKey));
+
+        // user initate a swap by sending transfer out
+        console.log(`========== transfer out ==========`);
+        tx = await program.methods
+            .prepare(uuid1, lp.publicKey, solAmount1, tokenAmount1, lock, isOut, memo)
+            .accounts({
+                payer: user.publicKey,
+                from: user.publicKey,
+                mint: null,
+                source: null,
+                escrow: escrow1,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                tokenSettings: null,
+                associatedTokenProgram: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([user, user])
+            .rpc();
+
+        console.log(`transfer out tx: ${tx}`);
+
+        console.log(`========== transfer in ==========`);
+        let uuid2 = generateUuid(
+            lp.publicKey,
+            user.publicKey,
+            lock.hash,
+            lock.agreementReachedTime,
+            lock.expectedSingleStepTime,
+            lock.tolerantSingleStepTime,
+            lock.earliestRefundTime,
+            fakeMint,
+            tokenAmount1,
+            solAmount1,
+        );
+        console.log(`generate uuid2: ${uuid2}`);
+
+        // calculate escrow account address offchain without create it
+        let [escrow2] = web3.PublicKey.findProgramAddressSync([Buffer.from(uuid2)], program.programId);
+        console.log(`offchain escrow2: ${escrow2}`);
+
+        // lp response to the swap initiated by user (transfer in)
+        const tx2 = await program.methods
+            .prepare(uuid2, user.publicKey, solAmount1, tokenAmount1, lock, isIn, memo)
+            .accounts({
+                payer: lp.publicKey,
+                from: lp.publicKey,
+                mint: null,
+                source: null,
+                escrow: escrow2,
+                escrowAta: null,
+                adminSettings: adminSettings,
+                tokenSettings: null,
+                associatedTokenProgram: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .signers([lp])
+            .rpc();
+
+        console.log(`transfer in tx: ${tx2}`);
+
+        console.log(`========== refund transfer out ==========`);
+        try {
+            // if user refund the swap before the agreement reached time + 6 * stepTimelock, it should throw error
+            await program.methods
+                .refund(uuid1, isOut)
+                .accounts({
+                    from: user.publicKey,
+                    source: null,
+                    escrow: escrow1,
+                    escrowAta: null,
+                    systemProgram: web3.SystemProgram.programId,
+                    tokenProgram: null,
+                })
+                .rpc();
+        } catch (err: any) {
+            console.log(`if it does not reach refund window, it should throw error`);
+            console.log(`========== error ==========`);
+            console.log((err as AnchorError).logs);
+            expect((err as AnchorError).logs).not.to.be.empty;
+        }
+        console.log(`wait until the earliestRefundTime: ${lock.earliestRefundTime}`);
+        while (true) {
+            let slot = await connection.getSlot();
+            let currentTime = await connection.getBlockTime(slot);
+            if (!currentTime) {
+                throw new Error("currentTime is null");
+            }
+            console.log(`currentTime: ${currentTime}`);
+            if (currentTime >= earliestRefundTime) {
+                break;
+            }
+            await sleep(1000);
+        }
+
+        // user refund the swap (transfer out)
+        const tx5 = await program.methods
+            .refund(uuid1, isOut)
+            .accounts({
+                from: user.publicKey,
+                source: null,
+                escrow: escrow1,
+                escrowAta: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .rpc();
+
+        console.log(`user refund transfer out tx: ${tx5}`);
+
+        console.log(`========== refund transfer in ==========`);
+        // lp refund the swap (transfer in)
+        const tx6 = await program.methods
+            .refund(uuid2, isIn)
+            .accounts({
+                from: lp.publicKey,
+                source: null,
+                escrow: escrow2,
+                escrowAta: null,
+                systemProgram: web3.SystemProgram.programId,
+                tokenProgram: null,
+            })
+            .rpc();
+
+        console.log(`lp refund transfer in tx: ${tx6}`);
+
+        let userSOLBalAfter = new BN(await connection.getBalance(user.publicKey));
+        expect(userSOLBalBefore.toNumber()).to.be.eq(userSOLBalAfter.toNumber());
+
+        let lpSOLBalAfter = new BN(await connection.getBalance(lp.publicKey));
         expect(lpSOLBalBefore.toNumber()).to.be.eq(lpSOLBalAfter.toNumber());
     });
 

@@ -761,16 +761,16 @@ describe("OBridge Swap", () => {
 
         try {
             await program.methods
-            .refundSwap(uuid1)
-            .accounts({
-                from: user.publicKey,
-                source: userAtaTokenMint1Account.address,
-                escrow: escrow1,
-                escrowAta: escrow1AtaTokenAccount,
-                systemProgram: web3.SystemProgram.programId,
-                tokenProgram: TOKEN_PROGRAM_ID,
-            })
-            .rpc();
+                .refundSwap(uuid1)
+                .accounts({
+                    from: user.publicKey,
+                    source: userAtaTokenMint1Account.address,
+                    escrow: escrow1,
+                    escrowAta: escrow1AtaTokenAccount,
+                    systemProgram: web3.SystemProgram.programId,
+                    tokenProgram: TOKEN_PROGRAM_ID,
+                })
+                .rpc();
         } catch (err: any) {
             console.log(`cannot refund before the refund window`);
             console.log(`========== error ==========`);

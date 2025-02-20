@@ -147,12 +147,14 @@ export type Obridge = {
         {
           "name": "mint",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "source",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -162,7 +164,8 @@ export type Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "adminSettings",
@@ -178,7 +181,8 @@ export type Obridge = {
         {
           "name": "associatedTokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -188,7 +192,8 @@ export type Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -250,7 +255,8 @@ export type Obridge = {
         {
           "name": "destination",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -260,7 +266,8 @@ export type Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "adminSettings",
@@ -275,7 +282,8 @@ export type Obridge = {
         {
           "name": "feeDestination",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -285,7 +293,8 @@ export type Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -324,7 +333,8 @@ export type Obridge = {
         {
           "name": "source",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -334,7 +344,8 @@ export type Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -344,7 +355,8 @@ export type Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -509,38 +521,48 @@ export type Obridge = {
     },
     {
       "code": 6003,
+      "name": "InvalidAccount",
+      "msg": "invalid account"
+    },
+    {
+      "code": 6004,
       "name": "InvalidFeeRate",
       "msg": "invalid fee rate"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSender",
       "msg": "invalid sender"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "InvalidRefundTime",
       "msg": "invalid refund time"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "DeadlineExceeded",
       "msg": "deadline exceeded"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "PreimageMismatch",
       "msg": "preimage mismatch"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "NotRefundable",
       "msg": "not refundable yet"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "InvalidDirection",
       "msg": "invalid direction"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidTokenSettings",
+      "msg": "invalid token settings"
     }
   ]
 };
@@ -694,12 +716,14 @@ export const IDL: Obridge = {
         {
           "name": "mint",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "source",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -709,7 +733,8 @@ export const IDL: Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "adminSettings",
@@ -725,7 +750,8 @@ export const IDL: Obridge = {
         {
           "name": "associatedTokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -735,7 +761,8 @@ export const IDL: Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -797,7 +824,8 @@ export const IDL: Obridge = {
         {
           "name": "destination",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -807,7 +835,8 @@ export const IDL: Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "adminSettings",
@@ -822,7 +851,8 @@ export const IDL: Obridge = {
         {
           "name": "feeDestination",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -832,7 +862,8 @@ export const IDL: Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -871,7 +902,8 @@ export const IDL: Obridge = {
         {
           "name": "source",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "escrow",
@@ -881,7 +913,8 @@ export const IDL: Obridge = {
         {
           "name": "escrowAta",
           "isMut": true,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         },
         {
           "name": "systemProgram",
@@ -891,7 +924,8 @@ export const IDL: Obridge = {
         {
           "name": "tokenProgram",
           "isMut": false,
-          "isSigner": false
+          "isSigner": false,
+          "isOptional": true
         }
       ],
       "args": [
@@ -1056,38 +1090,48 @@ export const IDL: Obridge = {
     },
     {
       "code": 6003,
+      "name": "InvalidAccount",
+      "msg": "invalid account"
+    },
+    {
+      "code": 6004,
       "name": "InvalidFeeRate",
       "msg": "invalid fee rate"
     },
     {
-      "code": 6004,
+      "code": 6005,
       "name": "InvalidSender",
       "msg": "invalid sender"
     },
     {
-      "code": 6005,
+      "code": 6006,
       "name": "InvalidRefundTime",
       "msg": "invalid refund time"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "DeadlineExceeded",
       "msg": "deadline exceeded"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "PreimageMismatch",
       "msg": "preimage mismatch"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "NotRefundable",
       "msg": "not refundable yet"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "InvalidDirection",
       "msg": "invalid direction"
+    },
+    {
+      "code": 6011,
+      "name": "InvalidTokenSettings",
+      "msg": "invalid token settings"
     }
   ]
 };
